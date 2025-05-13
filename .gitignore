@@ -7,3 +7,5 @@
 .classpath
 
 *.log
+
+build
