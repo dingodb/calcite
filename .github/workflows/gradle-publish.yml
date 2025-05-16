@@ -9,6 +9,7 @@ name: Gradle Package
 
 on:
   workflow_run:
+    workflows: ["Build"]
     types:
       - completed
     on:
