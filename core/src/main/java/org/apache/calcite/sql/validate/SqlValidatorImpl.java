@@ -2847,7 +2847,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
           parentScope,
           usingScope,
           node,
-          node,
+          enclosingNode,
           alias,
           forceNullable);
       break;
@@ -3051,9 +3051,23 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
 
     // A setop is in the same scope as its parent.
     scopes.put(call, parentScope);
-    for (SqlNode operand : call.getOperandList()) {
+    SqlValidatorScope recursiveScope = parentScope;
+    if (enclosingNode.getKind() == SqlKind.WITH_ITEM) {
+      if (node.getKind() != SqlKind.UNION) {
+        throw newValidationError(node, RESOURCE.recursiveWithMustHaveUnionSetOp());
+      } else if (call.getOperandList().size() > 2) {
+        throw newValidationError(node, RESOURCE.recursiveWithMustHaveTwoChildUnionSetOp());
+      }
+      final WithScope scope = (WithScope) scopes.get(enclosingNode);
+      // recursive scope is only set for the recursive queries.
+      recursiveScope = scope != null && scope.recursiveScope != null
+              ? requireNonNull(scope.recursiveScope) : parentScope;
+    }
+    for (int i = 0; i < call.getOperandList().size(); i++) {
+      SqlNode operand = call.getOperandList().get(i);
+      SqlValidatorScope scope = i == 0 ? parentScope : recursiveScope;
       registerQuery(
-          parentScope,
+          scope,
           null,
           operand,
           operand,
@@ -3078,11 +3092,14 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
     SqlValidatorScope scope = parentScope;
     for (SqlNode withItem_ : with.withList) {
       final SqlWithItem withItem = (SqlWithItem) withItem_;
-      final WithScope withScope = new WithScope(scope, withItem);
+      final boolean isRecursiveWith = withItem.recursive.booleanValue();
+
+      final WithScope withScope = new WithScope(scope, withItem,
+              isRecursiveWith ? new WithRecursiveScope(scope, withItem) : null);
       scopes.put(withItem, withScope);
 
-      registerQuery(scope, null, withItem.query, with,
-          withItem.name.getSimple(), false);
+      registerQuery(scope, null, withItem.query, withItem.recursive.booleanValue() ? withItem : with,
+              withItem.name.getSimple(), forceNullable);
       registerNamespace(null, alias,
           new WithItemNamespace(this, withItem, enclosingNode),
           false);

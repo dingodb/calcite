@@ -3463,6 +3463,28 @@ public abstract class RelOptUtil {
         .build();
   }
 
+  /** Returns the relational table node for {@code tableName} if it occurs within a
+   * relational expression {@code root} otherwise an empty option is returned. */
+  public static @Nullable RelOptTable findTable(RelNode root, final String tableName) {
+    try {
+      RelShuttle visitor = new RelHomogeneousShuttle() {
+        @Override public RelNode visit(TableScan scan) {
+          final RelOptTable scanTable = scan.getTable();
+          final List<String> qualifiedName = scanTable.getQualifiedName();
+          if (qualifiedName.get(qualifiedName.size() - 1).equals(tableName)) {
+            throw new Util.FoundOne(scanTable);
+          }
+          return super.visit(scan);
+        }
+      };
+      root.accept(visitor);
+      return null;
+    } catch (Util.FoundOne e) {
+      Util.swallow(e, null);
+      return (RelOptTable) e.getNode();
+    }
+  }
+
   @Deprecated // to be removed before 2.0
   public static RelNode createRename(
       RelNode rel,

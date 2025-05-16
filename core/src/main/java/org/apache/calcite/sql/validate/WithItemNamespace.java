@@ -39,7 +39,7 @@ class WithItemNamespace extends AbstractNamespace {
 
   @Override protected RelDataType validateImpl(RelDataType targetRowType) {
     final SqlValidatorNamespace childNs =
-        validator.getNamespaceOrThrow(withItem.query);
+        validator.getNamespaceOrThrow(getQuery());
     final RelDataType rowType = childNs.getRowTypeSansSystemColumns();
     SqlNodeList columnList = withItem.columnList;
     if (columnList == null) {
@@ -51,6 +51,10 @@ class WithItemNamespace extends AbstractNamespace {
         rowType.getFieldList(),
         (name, field) -> builder.add(name, field.getType()));
     return builder.build();
+  }
+
+  protected SqlNode getQuery() {
+    return withItem.query;
   }
 
   @Override public @Nullable SqlNode getNode() {
