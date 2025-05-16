@@ -92,8 +92,8 @@ publishing {
             url = uri("https://s01.oss.sonatype.org/content/repositories/snapshots/")
 
             credentials {
-                username = System.getenv("USERNAME")
-                password = System.getenv("TOKEN")
+                username = System.getenv("MAVEN_USERNAME")
+                password = System.getenv("MAVEN_TOKEN")
             }
         }
     }
