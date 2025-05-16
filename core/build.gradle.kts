@@ -92,8 +92,8 @@ publishing {
             url = uri("https://s01.oss.sonatype.org/content/repositories/snapshots/")
 
             credentials {
-                username = "wVi6ozic"
-                password = "C6uNfCfjGArNiPpNtiOtOmSnsVCjLVBd0+n5w/Wrt0pk"
+                username = System.getenv("USERNAME")
+                password = System.getenv("TOKEN")
             }
         }
     }
