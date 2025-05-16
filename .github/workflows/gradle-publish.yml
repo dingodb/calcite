@@ -8,9 +8,15 @@
 name: Gradle Package
 
 on:
-  release:
-    types: [created]
-
+  workflow_run:
+    types:
+      - completed
+    on:
+      branches:
+        - develop
+        - main
+      pull_requests:
+        - merged
 jobs:
   build:
 
