@@ -159,6 +159,12 @@ public class SqlTypeAssignmentRule implements SqlTypeMappingRule {
     rule.add(SqlTypeName.VARBINARY);
     rules.add(SqlTypeName.BINARY, rule);
 
+    //BIT is assignable from...
+    rule.clear();
+    rule.add(SqlTypeName.BIT);
+    rule.add(SqlTypeName.BINARY);
+    rules.add(SqlTypeName.BIT, rule);
+
     // DATE is assignable from...
     rule.clear();
     rule.add(SqlTypeName.DATE);

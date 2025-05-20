@@ -1006,6 +1006,22 @@ public class SqlLiteral extends SqlNode {
     return new SqlBinaryStringLiteral(bits, pos);
   }
 
+  public static SqlBinaryStringLiteral createBinaryStringFromBitString(
+      String s,
+      SqlParserPos pos) {
+    BitString bits;
+    try {
+      int prefix0Count = 8 - s.length() % 8;
+      if(prefix0Count != 0) {
+        s = "0".repeat(prefix0Count).concat(s);
+      }
+      bits = BitString.createFromBitString(s);
+    } catch (NumberFormatException e) {
+      throw SqlUtil.newContextException(pos, RESOURCE.binaryLiteralInvalid());
+    }
+    return new SqlBinaryStringLiteral(bits, pos);
+  }
+
   /**
    * Creates a string literal in the system character set.
    *

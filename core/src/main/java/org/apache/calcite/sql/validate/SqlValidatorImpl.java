@@ -2087,6 +2087,20 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
           inferUnknownTypes(operandTypes[i], scope, operand);
         }
       }
+
+      //Check bit value validation.
+      for (int i = 0; i < operands.size(); ++i) {
+        final SqlNode operand = operands.get(i);
+        if (operand != null && operandTypes[i].getSqlTypeName() == SqlTypeName.BIT) {
+          if (operand instanceof SqlLiteral && ((SqlLiteral) operand).getTypeName() == SqlTypeName.BINARY) {
+            String bitString = ((BitString) ((SqlLiteral) operand).getValue()).toString();
+            int pos1 = bitString.indexOf('1');
+            if((pos1 >= 0) && (bitString.length() - pos1 > operandTypes[i].getPrecision())) {
+              throw new AssertionError("Data too long for bit column.");
+            }
+          }
+        }
+      }
     }
   }
 
