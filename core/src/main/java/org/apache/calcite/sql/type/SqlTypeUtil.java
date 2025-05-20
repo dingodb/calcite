@@ -515,6 +515,7 @@ public abstract class SqlTypeUtil {
     case SMALLINT:
     case INTEGER:
     case BIGINT:
+    case BIT:
     case DECIMAL:
       return true;
     default:
@@ -1660,6 +1661,22 @@ public abstract class SqlTypeUtil {
       return -1;
     }
     return Integer.compare(p0, p1);
+  }
+
+  /**
+   * Returns whether a precision is greater or equal than another.
+   * @param precision type precision.
+   * @param length data length.
+   * @return equal or not.
+   */
+  public static boolean isValidBitValue(int precision, int length) {
+    if(precision == 1 && length == 1) {
+      return true;
+    }
+    if(length * 2 <= precision) {
+      return true;
+    }
+    return false;
   }
 
   /** Returns whether a type is ARRAY. */

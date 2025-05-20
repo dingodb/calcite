@@ -128,6 +128,10 @@ public class SqlBasicTypeNameSpec extends SqlTypeNameSpec {
     return precision;
   }
 
+  public SqlTypeName getSqlTypeName() {
+    return sqlTypeName;
+  }
+
   public @Nullable String getCharSetName() {
     return charSetName;
   }

@@ -363,7 +363,9 @@ public class RexLiteral extends RexNode {
         throw Util.unexpected(typeName);
       }
       // fall through
+
     case BINARY:
+    case BIT:
       return value instanceof ByteString;
     case VARCHAR: // not allowed -- use Char
       if (strict) {

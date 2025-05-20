@@ -109,6 +109,7 @@ public class SqlTypeCoercionRule implements SqlTypeMappingRule {
     rule.add(SqlTypeName.SMALLINT);
     rule.add(SqlTypeName.INTEGER);
     rule.add(SqlTypeName.BIGINT);
+    rule.add(SqlTypeName.BIT);
     rule.add(SqlTypeName.DECIMAL);
     rule.add(SqlTypeName.FLOAT);
     rule.add(SqlTypeName.REAL);
@@ -124,6 +125,7 @@ public class SqlTypeCoercionRule implements SqlTypeMappingRule {
     coerceRules.add(SqlTypeName.SMALLINT, rule);
     coerceRules.add(SqlTypeName.INTEGER, rule);
     coerceRules.add(SqlTypeName.BIGINT, rule);
+    coerceRules.add(SqlTypeName.BIT, rule);
     coerceRules.add(SqlTypeName.FLOAT, rule);
     coerceRules.add(SqlTypeName.REAL, rule);
     coerceRules.add(SqlTypeName.DECIMAL, rule);
@@ -158,6 +160,12 @@ public class SqlTypeCoercionRule implements SqlTypeMappingRule {
         coerceRules.copyValues(SqlTypeName.BINARY)
             .add(SqlTypeName.VARBINARY)
             .addAll(SqlTypeName.CHAR_TYPES)
+            .build());
+
+    // BIT is castable from BINARY.
+    coerceRules.add(SqlTypeName.BIT,
+        coerceRules.copyValues(SqlTypeName.BIT)
+            .add(SqlTypeName.BINARY)
             .build());
 
     // VARBINARY is castable from BINARY, CHARACTERS.
