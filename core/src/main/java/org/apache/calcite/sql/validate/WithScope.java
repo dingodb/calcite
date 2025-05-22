@@ -16,6 +16,7 @@
  */
 package org.apache.calcite.sql.validate;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.calcite.rel.type.StructKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlWithItem;
@@ -63,7 +64,7 @@ class WithScope extends ListScope {
       final SqlValidatorNamespace ns = validator.getNamespaceOrThrow(withItem);
       final Step path2 = path
           .plus(ns.getRowType(), 0, names.get(0), StructKind.FULLY_QUALIFIED);
-      resolved.found(ns, false, null, path2, null);
+      resolved.found(ns, false, this, path2, ImmutableList.of());
       return;
     }
     super.resolveTable(names, nameMatcher, path, resolved);

@@ -19,13 +19,8 @@ package org.apache.calcite.sql;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.util.SqlVisitor;
-import org.apache.calcite.sql.validate.SqlMoniker;
-import org.apache.calcite.sql.validate.SqlMonotonicity;
-import org.apache.calcite.sql.validate.SqlValidator;
-import org.apache.calcite.sql.validate.SqlValidatorImpl;
-import org.apache.calcite.sql.validate.SqlValidatorScope;
+import org.apache.calcite.sql.validate.*;
 import org.apache.calcite.util.Litmus;
-
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.checkerframework.dataflow.qual.Pure;
 
@@ -202,8 +197,7 @@ public abstract class SqlCall extends SqlNode {
     return SqlUtil.getOperatorSignature(getOperator(), signatureList);
   }
 
-  @Override public SqlMonotonicity getMonotonicity(@Nullable SqlValidatorScope scope) {
-    Objects.requireNonNull(scope, "scope");
+  @Override public SqlMonotonicity getMonotonicity(SqlValidatorScope scope) {
     // Delegate to operator.
     final SqlCallBinding binding =
         new SqlCallBinding(scope.getValidator(), scope, this);

@@ -16,6 +16,7 @@
  */
 package org.apache.calcite.sql.fun;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlFunction;
 import org.apache.calcite.sql.SqlFunctionCategory;
@@ -26,25 +27,31 @@ import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlWriter;
 import org.apache.calcite.sql.parser.SqlParserPos;
-import org.apache.calcite.sql.type.OperandTypes;
-import org.apache.calcite.sql.type.ReturnTypes;
-import org.apache.calcite.sql.type.SqlTypeFamily;
-import org.apache.calcite.sql.type.SqlTypeTransforms;
+import org.apache.calcite.sql.type.*;
 
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 import static java.util.Objects.requireNonNull;
+import static org.apache.calcite.sql.type.OperandTypes.family;
 
 /**
  * The <code>JSON_QUERY</code> function.
  */
 public class SqlJsonQueryFunction extends SqlFunction {
+  static final SqlSingleOperandTypeChecker TYPE_CHECKER =
+        family(
+            ImmutableList.of(
+                SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER,
+                SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.ANY))
+            .or(
+                family(
+                    ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER,
+                        SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.ANY)));
   public SqlJsonQueryFunction() {
     super("JSON_QUERY", SqlKind.OTHER_FUNCTION,
         ReturnTypes.VARCHAR_2000.andThen(SqlTypeTransforms.FORCE_NULLABLE),
         null,
-        OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER,
-            SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.ANY),
+        TYPE_CHECKER,
         SqlFunctionCategory.SYSTEM);
   }
 

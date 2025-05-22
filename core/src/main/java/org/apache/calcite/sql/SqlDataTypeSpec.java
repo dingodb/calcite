@@ -24,7 +24,6 @@ import org.apache.calcite.sql.validate.SqlMonotonicity;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql.validate.SqlValidatorScope;
 import org.apache.calcite.util.Litmus;
-
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 import java.util.Objects;
@@ -128,7 +127,7 @@ public class SqlDataTypeSpec extends SqlNode {
     return new SqlDataTypeSpec(typeNameSpec, timeZone, pos);
   }
 
-  @Override public SqlMonotonicity getMonotonicity(@Nullable SqlValidatorScope scope) {
+  @Override public SqlMonotonicity getMonotonicity(SqlValidatorScope scope) {
     return SqlMonotonicity.CONSTANT;
   }
 

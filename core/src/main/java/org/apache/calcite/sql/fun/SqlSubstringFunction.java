@@ -110,6 +110,9 @@ public class SqlSubstringFunction extends SqlFunction {
     case 3:
       if (!CHECKER3
           .checkOperandTypes(callBinding, throwOnFailure)) {
+        if (throwOnFailure) {
+          throw callBinding.newValidationSignatureError();
+        }
         return false;
       }
       // Reset the operands because they may be coerced during
@@ -117,13 +120,12 @@ public class SqlSubstringFunction extends SqlFunction {
       final List<SqlNode> operands = callBinding.getCall().getOperandList();
       final RelDataType t1 = callBinding.getOperandType(1);
       final RelDataType t2 = callBinding.getOperandType(2);
-      if (SqlTypeUtil.inCharFamily(t1)) {
-        if (!SqlTypeUtil.isCharTypeComparable(callBinding, operands,
-            throwOnFailure)) {
-          return false;
+      if (!(SqlTypeUtil.isIntType(t1) || SqlTypeUtil.isNull(t1))) {
+        if (throwOnFailure) {
+          throw callBinding.newValidationSignatureError();
         }
       }
-      if (!SqlTypeUtil.inSameFamily(t1, t2)) {
+      if (!SqlTypeUtil.inSameFamilyOrNull(t1, t2)) {
         if (throwOnFailure) {
           throw callBinding.newValidationSignatureError();
         }
