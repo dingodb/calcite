@@ -22,6 +22,7 @@ import org.apache.calcite.sql.SqlIntervalQualifier;
 import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.type.BasicSqlType;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.util.IndexColumnName;
 import org.apache.calcite.util.Pair;
 import org.apache.calcite.util.Util;
 
@@ -105,8 +106,10 @@ public abstract class RelDataTypeImpl
         return field;
       }
     } else {
+      boolean isIndex = fieldName.toLowerCase().contains(IndexColumnName.TEXT_INDEX_COLUMN)
+              || fieldName.toLowerCase().contains(IndexColumnName.VECTOR_INDEX_COLUMN);
       for (RelDataTypeField field : fieldList) {
-        if (Util.matches(caseSensitive, field.getName(), fieldName)) {
+        if (Util.matches(isIndex ? false : caseSensitive, field.getName(), fieldName)) {
           return field;
         }
       }
