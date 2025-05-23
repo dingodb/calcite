@@ -1040,4 +1040,10 @@ public interface CalciteResource {
   @BaseMessage("ASOF JOIN does not support correlated subqueries")
   ExInst<CalciteException> asofCannotBeCorrelated();
 
+  @BaseMessage("A recursive query only supports UNION [ALL] operator")
+  ExInst<SqlValidatorException> recursiveWithMustHaveUnionSetOp();
+
+  @BaseMessage("A recursive query only supports binary UNION [ALL] operator")
+  ExInst<SqlValidatorException> recursiveWithMustHaveTwoChildUnionSetOp();
+
 }

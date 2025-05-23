@@ -21,13 +21,7 @@ import org.apache.calcite.config.NullCollation;
 import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.linq4j.Ord;
 import org.apache.calcite.linq4j.tree.TableExpressionFactory;
-import org.apache.calcite.plan.RelOptCluster;
-import org.apache.calcite.plan.RelOptPlanner;
-import org.apache.calcite.plan.RelOptSamplingParameters;
-import org.apache.calcite.plan.RelOptTable;
-import org.apache.calcite.plan.RelOptUtil;
-import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.plan.ViewExpanders;
+import org.apache.calcite.plan.*;
 import org.apache.calcite.prepare.Prepare;
 import org.apache.calcite.prepare.RelOptTableImpl;
 import org.apache.calcite.rel.RelCollation;
@@ -113,24 +107,7 @@ import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.calcite.sql.type.TableFunctionReturnTypeInference;
 import org.apache.calcite.sql.util.SqlBasicVisitor;
 import org.apache.calcite.sql.util.SqlVisitor;
-import org.apache.calcite.sql.validate.AggregatingSelectScope;
-import org.apache.calcite.sql.validate.CollectNamespace;
-import org.apache.calcite.sql.validate.DelegatingScope;
-import org.apache.calcite.sql.validate.ListScope;
-import org.apache.calcite.sql.validate.MatchRecognizeScope;
-import org.apache.calcite.sql.validate.ParameterScope;
-import org.apache.calcite.sql.validate.SelectScope;
-import org.apache.calcite.sql.validate.SqlMonotonicity;
-import org.apache.calcite.sql.validate.SqlNameMatcher;
-import org.apache.calcite.sql.validate.SqlQualified;
-import org.apache.calcite.sql.validate.SqlUserDefinedTableFunction;
-import org.apache.calcite.sql.validate.SqlUserDefinedTableMacro;
-import org.apache.calcite.sql.validate.SqlValidator;
-import org.apache.calcite.sql.validate.SqlValidatorImpl;
-import org.apache.calcite.sql.validate.SqlValidatorNamespace;
-import org.apache.calcite.sql.validate.SqlValidatorScope;
-import org.apache.calcite.sql.validate.SqlValidatorTable;
-import org.apache.calcite.sql.validate.SqlValidatorUtil;
+import org.apache.calcite.sql.validate.*;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.ImmutableBitSet;
@@ -306,7 +283,7 @@ public class SqlToRelConverter {
     this.exprConverter = new SqlNodeToRexConverterImpl(convertletTable);
     this.explainParamCount = 0;
     this.config = requireNonNull(config, "config");
-    this.relBuilder = config.getRelBuilderFactory().create(cluster, null)
+    this.relBuilder = config.getRelBuilderFactory().create(cluster, validator != null ? validator.getCatalogReader().unwrap(RelOptSchema.class) : null)
         .transform(config.getRelBuilderConfigTransform());
     this.hintStrategies = config.getHintStrategyTable();
 
@@ -2349,6 +2326,11 @@ public class SqlToRelConverter {
       convertIdentifier(bb, (SqlIdentifier) from, null, null);
       return;
 
+      case WITH_ITEM_TABLE_REF:
+        SqlWithItemTableRef withItemTableRef = (SqlWithItemTableRef) from;
+        convertTransientScan(bb, withItemTableRef.getWithItem());
+        return;
+
     case EXTEND:
       call = (SqlCall) from;
       final SqlNode operand0 = call.getOperandList().get(0);
@@ -2718,6 +2700,14 @@ public class SqlToRelConverter {
     relBuilder.convert(getNamespace(unpivot).getRowType(), false);
 
     bb.setRoot(relBuilder.build(), true);
+  }
+
+  private void convertTransientScan(Blackboard bb, SqlWithItem withItem) {
+    final SqlValidatorNamespace fromNamespace = getNamespace(withItem).resolve();
+    bb.setRoot(
+            relBuilder.transientScan(withItem.name.getSimple(),
+                    fromNamespace.getRowType()).build(),
+            true);
   }
 
   private void convertIdentifier(Blackboard bb, SqlIdentifier id,
@@ -3718,6 +3708,34 @@ public class SqlToRelConverter {
     }
   }
 
+  private RelNode createUnion(SqlCall call,
+                              RelNode left,
+                              RelNode right) {
+    SqlValidatorNamespace nameSpace = this.validator().getNamespace(call);
+    boolean all = all(call);
+    if (nameSpace != null) {
+      SqlNode enclosingNode = nameSpace.getEnclosingNode();
+      if (enclosingNode != null) {
+        String name = "";
+        if (enclosingNode.getKind() == SqlKind.WITH_ITEM) {
+          name = ((SqlWithItem) enclosingNode).name.getSimple();
+        }
+        if (RelOptUtil.findTable(right, name) != null) {
+          return this.relBuilder.
+                  push(left).
+                  push(right).
+                  repeatUnion(name, all).
+                  build();
+        }
+      }
+    }
+    return relBuilder
+            .push(left)
+            .push(right)
+            .union(all, 2)
+            .build();
+  }
+
   /**
    * Converts a set operation (UNION, INTERSECT, MINUS) into relational
    * expressions.
@@ -3732,7 +3750,7 @@ public class SqlToRelConverter {
         convertQueryRecursive(call.operand(1), false, null).project();
     switch (call.getKind()) {
     case UNION:
-      return LogicalUnion.create(ImmutableList.of(left, right), all(call));
+      return createUnion(call, left, right);
 
     case INTERSECT:
       return LogicalIntersect.create(ImmutableList.of(left, right), all(call));
