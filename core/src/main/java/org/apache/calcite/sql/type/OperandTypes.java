@@ -557,11 +557,12 @@ public abstract class OperandTypes {
             SqlCallBinding callBinding,
             SqlNode node,
             int iFormalOperand,
+            SqlTypeFamily family,
             boolean throwOnFailure) {
           if (!LITERAL.checkSingleOperandType(
               callBinding,
               node,
-              iFormalOperand,
+              0,
               throwOnFailure)) {
             return false;
           }
@@ -570,6 +571,7 @@ public abstract class OperandTypes {
               callBinding,
               node,
               iFormalOperand,
+              family,
               throwOnFailure)) {
             return false;
           }
@@ -766,14 +768,14 @@ public abstract class OperandTypes {
       new FamilyOperandTypeChecker(ImmutableList.of(SqlTypeFamily.ANY),
           i -> false) {
         @Override public boolean checkSingleOperandType(
-            SqlCallBinding callBinding, SqlNode node,
-            int iFormalOperand, boolean throwOnFailure) {
-          if (!super.checkSingleOperandType(callBinding, node, iFormalOperand,
+            SqlCallBinding callBinding, SqlNode operand,
+            int iFormalOperand, SqlTypeFamily family, boolean throwOnFailure) {
+          if (!super.checkSingleOperandType(callBinding, operand, iFormalOperand, family,
               throwOnFailure)) {
             return false;
           }
           final SqlValidatorScope scope = callBinding.getScope();
-          if (!scope.isMeasureRef(node)) {
+          if (!scope.isMeasureRef(operand)) {
             if (throwOnFailure) {
               throw callBinding.newValidationError(
                   RESOURCE.argumentMustBeMeasure(
@@ -863,6 +865,15 @@ public abstract class OperandTypes {
             SqlCallBinding callBinding,
             boolean throwOnFailure) {
           if (!super.checkOperandTypes(callBinding, throwOnFailure)) {
+            return false;
+          }
+          return SAME_SAME.checkOperandTypes(callBinding, throwOnFailure);
+        }
+
+        @Override public boolean checkOperandTypesWithoutTypeCoercion(
+                final SqlCallBinding callBinding,
+                final boolean throwOnFailure) {
+          if (!super.checkOperandTypesWithoutTypeCoercion(callBinding, throwOnFailure)) {
             return false;
           }
           return SAME_SAME.checkOperandTypes(callBinding, throwOnFailure);
