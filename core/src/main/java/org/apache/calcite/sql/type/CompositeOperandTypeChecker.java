@@ -312,7 +312,7 @@ public class CompositeOperandTypeChecker implements SqlOperandTypeChecker {
         if (!((SqlSingleOperandTypeChecker) rule).checkSingleOperandType(
             callBinding,
             callBinding.getCall().operand(ord.i),
-            rule.getClass() == FamilyOperandTypeChecker.class ? 0 : ord.i,
+            ord.i,
             throwOnFailure)) {
           if (callBinding.isTypeCoercionEnabled()) {
             return coerceOperands(callBinding, false);
@@ -383,7 +383,17 @@ public class CompositeOperandTypeChecker implements SqlOperandTypeChecker {
     if (!callBinding.isTypeCoercionEnabled()) {
       return false;
     }
+    SqlCallBinding sqlBindingWithoutTypeCoercion = new SqlCallBinding(callBinding.getValidator(), callBinding.getScope(),
+            callBinding.getCall()) {
+      @Override
+      public boolean isTypeCoercionEnabled() {
+        return false;
+      }
+    };
     for (SqlOperandTypeChecker rule : allowedRules) {
+      if (rule.checkOperandTypes(sqlBindingWithoutTypeCoercion, false)) {
+        return true;
+      }
       if (rule instanceof ImplicitCastOperandTypeChecker) {
         ImplicitCastOperandTypeChecker rule1 = (ImplicitCastOperandTypeChecker) rule;
         if (rule1.checkOperandTypesWithoutTypeCoercion(callBinding, false)) {
