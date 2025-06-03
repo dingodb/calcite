@@ -1878,7 +1878,7 @@ public class SqlToRelConverter {
       if (!values.getTuples().isEmpty()) {
         unionInputs.add(values);
       }
-      resultRel = LogicalUnion.create(unionInputs, true);
+      resultRel = LogicalUnion.createUnionProject(unionInputs, true);
     }
     leaves.put(resultRel, resultRel.getRowType().getFieldCount());
     return resultRel;
@@ -4640,11 +4640,18 @@ public class SqlToRelConverter {
       relBuilder.push(in)
           .project(Pair.left(exps), Pair.right(exps));
     }
-
-    bb.setRoot(
-        relBuilder.union(true, values.getOperandList().size())
-            .build(),
-        true);
+    RelNode relNodeTmp = relBuilder.union(true, values.getOperandList().size())
+            .build();
+    if (relNodeTmp instanceof LogicalUnion) {
+       LogicalUnion logicalUnion = (LogicalUnion) relNodeTmp;
+       logicalUnion.addProject = true;
+       bb.setRoot(logicalUnion, true);
+       return;
+    } else {
+      bb.setRoot(
+              relNodeTmp,
+              true);
+    }
   }
 
   //~ Inner Classes ----------------------------------------------------------
