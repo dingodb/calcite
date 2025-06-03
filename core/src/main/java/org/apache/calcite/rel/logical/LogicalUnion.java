@@ -32,7 +32,8 @@ import java.util.List;
  * Sub-class of {@link org.apache.calcite.rel.core.Union}
  * not targeted at any particular engine or calling convention.
  */
-public final class LogicalUnion extends Union {
+public class LogicalUnion extends Union {
+  public boolean addProject;
   //~ Constructors -----------------------------------------------------------
 
   /**
@@ -46,6 +47,15 @@ public final class LogicalUnion extends Union {
       List<RelNode> inputs,
       boolean all) {
     super(cluster, traitSet, hints, inputs, all);
+  }
+
+  public LogicalUnion(RelOptCluster cluster,
+                      RelTraitSet traitSet,
+                      List<RelHint> hints,
+                      List<RelNode> inputs,
+                      boolean all, boolean addProject) {
+    super(cluster, traitSet, hints, inputs, all);
+    this.addProject = addProject;
   }
 
   /**
@@ -80,12 +90,21 @@ public final class LogicalUnion extends Union {
     return new LogicalUnion(cluster, traitSet, inputs, all);
   }
 
+  /** Creates a LogicalUnion. */
+  public static LogicalUnion createUnionProject(List<RelNode> inputs, boolean all) {
+    final RelOptCluster cluster = inputs.get(0).getCluster();
+    final RelTraitSet traitSet = cluster.traitSetOf(Convention.NONE);
+    LogicalUnion logicalUnion = new LogicalUnion(cluster, traitSet, inputs, all);
+    logicalUnion.addProject = true;
+    return logicalUnion;
+  }
+
   //~ Methods ----------------------------------------------------------------
 
   @Override public LogicalUnion copy(
       RelTraitSet traitSet, List<RelNode> inputs, boolean all) {
     assert traitSet.containsIfApplicable(Convention.NONE);
-    return new LogicalUnion(getCluster(), traitSet, hints, inputs, all);
+    return new LogicalUnion(getCluster(), traitSet, hints, inputs, all, addProject);
   }
 
   @Override public RelNode accept(RelShuttle shuttle) {
