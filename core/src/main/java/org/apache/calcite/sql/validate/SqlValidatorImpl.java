@@ -131,6 +131,7 @@ import org.slf4j.Logger;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.sql.SQLException;
 import java.util.AbstractList;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -5192,6 +5193,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
     final SqlValidatorTable table = relOptTable == null
         ? getTable(targetNamespace)
         : relOptTable.unwrapOrThrow(SqlValidatorTable.class);
+    validateUpdateValues(call, table);
 
     final RelDataType targetRowType =
         createTargetRowType(
@@ -5212,6 +5214,39 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
     checkConstraint(table, call, targetRowType);
 
     validateAccess(call.getTargetTable(), table, SqlAccessEnum.UPDATE);
+  }
+
+  public void validateUpdateValues(SqlUpdate call, SqlValidatorTable table) {
+    if (call.getTargetColumnList().size() != call.getSourceExpressionList().size()) {
+      return;
+    }
+    final RelOptTable relOptTable = table instanceof RelOptTable
+            ? ((RelOptTable) table) : null;
+    RelDataType baseRowType = table.getRowType();
+    final Set<Integer> assignedFields = new HashSet<>();
+    List<RelDataTypeField> fields = new ArrayList<>();
+    for (SqlNode node : call.getTargetColumnList()) {
+      SqlIdentifier id = (SqlIdentifier) node;
+      RelDataTypeField targetField =
+              SqlValidatorUtil.getTargetField(
+                      baseRowType, typeFactory, id, catalogReader, relOptTable);
+      if (targetField == null) {
+        throw newValidationError(id,
+                RESOURCE.unknownTargetColumn(id.toString()));
+      }
+      if (!assignedFields.add(targetField.getIndex())) {
+        throw newValidationError(id,
+                RESOURCE.duplicateTargetColumn(targetField.getName()));
+      }
+      fields.add(targetField);
+    }
+    for (int i = 0; i < fields.size(); i ++) {
+       SqlNode source = call.getSourceExpressionList().get(i);
+       if (!fields.get(i).getType().isNullable() && SqlUtil.isNullLiteral(source, false)) {
+         throw newValidationError(source,
+                 RESOURCE.columnNotNull(fields.get(i).getName()));
+       }
+    }
   }
 
   @Override public void validateMerge(SqlMerge call) {

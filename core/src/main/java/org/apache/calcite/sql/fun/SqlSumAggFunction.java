@@ -54,7 +54,7 @@ public class SqlSumAggFunction extends SqlAggFunction {
         SqlKind.SUM,
         ReturnTypes.AGG_SUM,
         null,
-        OperandTypes.NUMERIC,
+        OperandTypes.ANY,
         SqlFunctionCategory.NUMERIC,
         false,
         false,
