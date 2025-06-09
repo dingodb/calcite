@@ -88,8 +88,10 @@ import org.apache.calcite.sql.SqlWithItem;
 import org.apache.calcite.sql.TableCharacteristic;
 import org.apache.calcite.sql.fun.SqlCase;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
+import org.apache.calcite.sql.fun.SqlSumAggFunction;
 import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.type.AssignableOperandTypeChecker;
+import org.apache.calcite.sql.type.BasicSqlType;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SqlOperandTypeChecker;
@@ -253,7 +255,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
    * since in some cases (such as null literals) we need to discriminate by
    * instance.
    */
-  private final IdentityHashMap<SqlNode, RelDataType> nodeToTypeMap =
+  protected IdentityHashMap<SqlNode, RelDataType> nodeToTypeMap =
       new IdentityHashMap<>();
 
   /** Provides the data for {@link #getValidatedOperandTypes(SqlCall)}. */
@@ -4352,11 +4354,11 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
     case CUBE:
       call = (SqlCall) groupByItem;
       for (SqlNode operand : call.getOperandList()) {
-        validateExpr(operand, groupByScope);
+        validateExpr(operand, groupByScope, null, 0);
       }
       break;
     default:
-      validateExpr(groupByItem, groupByScope);
+      validateExpr(groupByItem, groupByScope, null, 0);
     }
   }
 
@@ -4379,7 +4381,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
     }
 
     final SqlValidatorScope orderScope = getOrderScope(select);
-    validateExpr(orderItem, orderScope);
+    validateExpr(orderItem, orderScope, null, 0);
   }
 
   @Override public SqlNode expandOrderExpr(SqlSelect select, SqlNode orderExpr) {
@@ -4619,12 +4621,14 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
 
     final boolean aggregate = isAggregate(select) || select.isDistinct();
     for (SqlNode selectItem : expandedSelectItems) {
+      int i = 0;
       if (SqlValidatorUtil.isMeasure(selectItem) && aggregate) {
         throw newValidationError(selectItem,
                 RESOURCE.measureInAggregateQuery());
       }
       validateNoAggs(groupFinder, selectItem, "SELECT");
-      validateExpr(selectItem, selectScope);
+      validateExpr(selectItem, selectScope, fieldList, i);
+      i++;
     }
 
     return typeFactory.createStructType(fieldList);
@@ -4636,7 +4640,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
    * @param expr  Expression
    * @param scope Scope in which expression occurs
    */
-  private void validateExpr(SqlNode expr, SqlValidatorScope scope) {
+  private void validateExpr(SqlNode expr, SqlValidatorScope scope, List<Map.Entry<String, RelDataType>> fieldTypeList,  int fieldIndex) {
     if (expr instanceof SqlCall) {
       final SqlOperator op = ((SqlCall) expr).getOperator();
       if (op.isAggregator() && op.requiresOver()) {
@@ -4656,6 +4660,12 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
         && scope.isMeasureRef(expr)) {
       throw newValidationError(expr,
           RESOURCE.measureMustBeInAggregateQuery());
+    }
+
+    if(expr instanceof SqlBasicCall && fieldTypeList != null) {
+      ((SqlBasicCall)expr).setFieldType(fieldTypeList.get(fieldIndex).getValue());
+      ((SqlBasicCall)expr).setFieldTypeList(fieldTypeList);
+      ((SqlBasicCall)expr).setFieldIndex(fieldIndex);
     }
 
     // Call on the expression to validate itself.
@@ -5773,7 +5783,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
     inferUnknownTypes(unknownType, scope, list);
 
     for (SqlNode node : list) {
-      validateExpr(node, scope);
+      validateExpr(node, scope, null, 0);
     }
 
     mr.setOperand(SqlMatchRecognize.OPERAND_MEASURES, list);
@@ -5838,7 +5848,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
         new SqlNodeList(sqlNodes, mr.getPatternDefList().getParserPosition());
     inferUnknownTypes(unknownType, scope, list);
     for (SqlNode node : list) {
-      validateExpr(node, scope);
+      validateExpr(node, scope, null, 0);
     }
     mr.setOperand(SqlMatchRecognize.OPERAND_PATTERN_DEFINES, list);
   }

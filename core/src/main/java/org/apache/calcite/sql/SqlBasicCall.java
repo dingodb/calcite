@@ -16,12 +16,14 @@
  */
 package org.apache.calcite.sql;
 
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.util.ImmutableNullableList;
 
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import static org.apache.calcite.linq4j.Nullness.castNonNull;
@@ -33,6 +35,10 @@ public class SqlBasicCall extends SqlCall {
   private SqlOperator operator;
   private List<@Nullable SqlNode> operandList;
   private final @Nullable SqlLiteral functionQuantifier;
+  private RelDataType fieldType = null;
+
+  private List<Map.Entry<String, RelDataType>> fieldTypeList;
+  private int fieldIndex;
 
   @Deprecated // to be removed before 2.0
   public SqlBasicCall(
@@ -80,6 +86,30 @@ public class SqlBasicCall extends SqlCall {
 
   @Override public SqlKind getKind() {
     return operator.getKind();
+  }
+
+  public RelDataType getFieldType() {
+    return fieldType;
+  }
+
+  public void setFieldType(RelDataType ft) {
+    fieldType = ft;
+  }
+
+  public void setFieldTypeList(List<Map.Entry<String, RelDataType>> ftl) {
+    fieldTypeList = ftl;
+  }
+
+  public List<Map.Entry<String, RelDataType>> getFieldTypeList() {
+    return fieldTypeList;
+  }
+
+  public void setFieldIndex(int fi) {
+    fieldIndex = fi;
+  }
+
+  public int getFieldIndex() {
+    return fieldIndex;
   }
 
   /** Sets whether this call is expanded.
