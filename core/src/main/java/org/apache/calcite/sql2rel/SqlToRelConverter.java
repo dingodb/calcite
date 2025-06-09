@@ -5614,10 +5614,10 @@ public class SqlToRelConverter {
    * </ul>
    */
   protected class AggConverter implements SqlVisitor<Void> {
-    private final Blackboard bb;
-    public final @Nullable AggregatingSelectScope aggregatingSelectScope;
+    private Blackboard bb;
+    public @Nullable AggregatingSelectScope aggregatingSelectScope;
 
-    private final Map<String, String> nameMap = new HashMap<>();
+    protected Map<String, String> nameMap = new HashMap<>();
 
     /**
      * The group-by expressions, in {@link SqlNode} format.
@@ -5653,7 +5653,7 @@ public class SqlToRelConverter {
     /** Whether we are directly inside a windowed aggregate. */
     private boolean inOver = false;
 
-    AggConverter(Blackboard bb, @Nullable AggregatingSelectScope aggregatingSelectScope) {
+    protected AggConverter(Blackboard bb, @Nullable AggregatingSelectScope aggregatingSelectScope) {
       this.bb = bb;
       this.aggregatingSelectScope = aggregatingSelectScope;
     }
