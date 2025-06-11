@@ -68,7 +68,7 @@ public abstract class RelOptAbstractTable implements RelOptTable {
   }
 
   @Override public double getRowCount() {
-    return 100;
+    return 10000;
   }
 
   @Override public RelDataType getRowType() {

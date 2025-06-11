@@ -240,7 +240,7 @@ public class RelOptTableImpl extends Prepare.AbstractPreparingTable {
         return rowCount;
       }
     }
-    return 100d;
+    return 10000d;
   }
 
   @Override public @Nullable RelOptSchema getRelOptSchema() {
