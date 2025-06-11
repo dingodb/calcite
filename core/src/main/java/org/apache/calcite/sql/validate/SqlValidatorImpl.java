@@ -4620,8 +4620,8 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
     inferUnknownTypes(targetRowType, selectScope, newSelectList);
 
     final boolean aggregate = isAggregate(select) || select.isDistinct();
+    int i = 0;
     for (SqlNode selectItem : expandedSelectItems) {
-      int i = 0;
       if (SqlValidatorUtil.isMeasure(selectItem) && aggregate) {
         throw newValidationError(selectItem,
                 RESOURCE.measureInAggregateQuery());
