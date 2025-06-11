@@ -104,6 +104,13 @@ public class SqlAsOperator extends SqlSpecialOperator {
     final List<SqlNode> operands = call.getOperandList();
     assert operands.size() == 2;
     assert operands.get(1) instanceof SqlIdentifier;
+
+    if(call instanceof SqlBasicCall && operands.get(0) instanceof SqlBasicCall) {
+      ((SqlBasicCall) operands.get(0)).setFieldType(((SqlBasicCall)call).getFieldType());
+      ((SqlBasicCall) operands.get(0)).setFieldTypeList(((SqlBasicCall)call).getFieldTypeList());
+      ((SqlBasicCall) operands.get(0)).setFieldIndex(((SqlBasicCall)call).getFieldIndex());
+    }
+
     operands.get(0).validateExpr(validator, scope);
     SqlIdentifier id = (SqlIdentifier) operands.get(1);
     if (!id.isSimple()) {
