@@ -827,8 +827,11 @@ public abstract class OperandTypes {
   public static final SqlSingleOperandTypeChecker INTERVAL_DATETIME =
       family(SqlTypeFamily.DATETIME_INTERVAL, SqlTypeFamily.DATETIME);
 
+  public static final SqlSingleOperandTypeChecker INTERVAL_STRING =
+      family(SqlTypeFamily.DATETIME_INTERVAL, SqlTypeFamily.STRING);
+
   public static final SqlSingleOperandTypeChecker INTERVALINTERVAL_INTERVALDATETIME =
-      INTERVAL_SAME_SAME.or(INTERVAL_DATETIME);
+      INTERVAL_SAME_SAME.or(INTERVAL_DATETIME).or(INTERVAL_STRING);
 
   // TODO: datetime+interval checking missing
   // TODO: interval+datetime checking missing
