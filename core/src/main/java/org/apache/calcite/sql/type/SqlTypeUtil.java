@@ -1795,6 +1795,7 @@ public abstract class SqlTypeUtil {
     int maxPrecision = factory.getTypeSystem().getMaxNumericPrecision();
     // scale should not greater than precision.
     int scale = maxPrecision / 2;
+    scale = scale > 30 ? 30 : scale;
     return factory.createSqlType(SqlTypeName.DECIMAL, maxPrecision, scale);
   }
 
