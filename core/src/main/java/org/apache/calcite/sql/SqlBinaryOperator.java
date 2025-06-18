@@ -143,10 +143,6 @@ public class SqlBinaryOperator extends SqlOperator {
       Charset cs1 = operandType1.getCharset();
       assert (null != cs0) && (null != cs1)
           : "An implicit or explicit charset should have been set";
-      if (!cs0.equals(cs1)) {
-        throw validator.newValidationError(call,
-            RESOURCE.incompatibleCharset(getName(), cs0.name(), cs1.name()));
-      }
 
       SqlCollation collation0 = operandType0.getCollation();
       SqlCollation collation1 = operandType1.getCollation();
