@@ -6,11 +6,12 @@ import com.github.vlsi.gradle.ide.dsl.taskTriggers
 plugins {
     id("java")
     id("maven-publish")
-    kotlin("jvm") version "1.9.0"
+    kotlin("jvm") version "1.9.20"
     id("com.github.vlsi.crlf") version "1.0.0"
     id("com.github.vlsi.ide") version "1.0.0"
     id("org.jetbrains.gradle.plugin.idea-ext") version "1.1.5"
     id("org.javacc.javacc") version "3.0.0"
+    id("com.vanniktech.maven.publish")
 }
 
 group = "io.dingodb"
@@ -77,19 +78,21 @@ dependencies {
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.8.1")
 }
 
+mavenPublishing {
+    coordinates("io.dingodb", "calcite-core", "1.33.0-SNAPSHOT")
+    publishToMavenCentral()
+}
+
 publishing {
     publications {
         create<MavenPublication>("mavenJava") {
             from(components["java"])
-            groupId = "io.dingodb"
-            artifactId = "calcite-core"
-            version = "1.33.0-SNAPSHOT"
         }
     }
 
     repositories {
         maven {
-            url = uri("https://s01.oss.sonatype.org/content/repositories/snapshots/")
+            url = uri("https://central.sonatype.com/repository/maven-snapshots/")
 
             credentials {
                 username = System.getenv("MAVEN_USERNAME")

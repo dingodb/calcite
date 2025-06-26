@@ -2,6 +2,7 @@
 plugins {
     id("java")
     id("maven-publish")
+    id("com.vanniktech.maven.publish")
 }
 
 group = "io.dingodb"
@@ -18,19 +19,21 @@ dependencies {
     implementation("org.apache.calcite.avatica:avatica-core:1.26.0")
 }
 
+mavenPublishing {
+    coordinates("io.dingodb", "calcite-linq4j", "1.33.0-SNAPSHOT")
+    publishToMavenCentral()
+}
+
 publishing {
     publications {
         create<MavenPublication>("mavenJava") {
             from(components["java"])
-            groupId = "io.dingodb"
-            artifactId = "calcite-linq4j"
-            version = "1.33.0-SNAPSHOT"
         }
     }
 
     repositories {
         maven {
-            url = uri("https://s01.oss.sonatype.org/content/repositories/snapshots/")
+            url = uri("https://central.sonatype.com/repository/maven-snapshots/")
 
             credentials {
                 username = System.getenv("MAVEN_USERNAME")
