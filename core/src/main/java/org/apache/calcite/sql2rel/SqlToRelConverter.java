@@ -4686,7 +4686,7 @@ public class SqlToRelConverter {
   /**
    * Workspace for translating an individual SELECT statement (or sub-SELECT).
    */
-  protected class Blackboard implements SqlRexContext, SqlVisitor<RexNode>,
+  public class Blackboard implements SqlRexContext, SqlVisitor<RexNode>,
       InitializerContext {
     /**
      * Collection of {@link RelNode} objects which correspond to a SELECT
@@ -4749,7 +4749,7 @@ public class SqlToRelConverter {
      *                      null otherwise
      * @param top           Whether this is the root of the query
      */
-    protected Blackboard(@Nullable SqlValidatorScope scope,
+    public Blackboard(@Nullable SqlValidatorScope scope,
         @Nullable Map<String, RexNode> nameToNodeMap, boolean top) {
       this.scope = requireNonNull(scope, "scope");
       this.nameToNodeMap = nameToNodeMap;
