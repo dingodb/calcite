@@ -15,7 +15,7 @@ plugins {
 }
 
 group = "io.dingodb"
-version = "1.33.0-SNAPSHOT"
+version = project.property("calcite.version") as String
 
 repositories {
     mavenCentral()
@@ -79,7 +79,7 @@ dependencies {
 }
 
 mavenPublishing {
-    coordinates("io.dingodb", "calcite-core", "1.33.0-SNAPSHOT")
+    coordinates("io.dingodb", "calcite-core", project.property("calcite.version") as String)
     publishToMavenCentral()
 }
 
@@ -92,7 +92,11 @@ publishing {
 
     repositories {
         maven {
-            url = uri("https://central.sonatype.com/repository/maven-snapshots/")
+            url = if (version.toString().endsWith("SNAPSHOT")) {
+                uri("https://central.sonatype.com/repository/maven-snapshots/")
+            } else {
+                uri("https://ossrh-staging-api.central.sonatype.com/service/local/");
+            }
 
             credentials {
                 username = System.getenv("MAVEN_USERNAME")
