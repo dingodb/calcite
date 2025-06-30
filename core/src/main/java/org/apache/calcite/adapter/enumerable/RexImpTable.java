@@ -165,6 +165,7 @@ import static org.apache.calcite.sql.fun.SqlLibraryOperators.SOUNDEX;
 import static org.apache.calcite.sql.fun.SqlLibraryOperators.SPACE;
 import static org.apache.calcite.sql.fun.SqlLibraryOperators.STARTS_WITH;
 import static org.apache.calcite.sql.fun.SqlLibraryOperators.STRCMP;
+import static org.apache.calcite.sql.fun.SqlLibraryOperators.SUBSTRING_INDEX;
 import static org.apache.calcite.sql.fun.SqlLibraryOperators.TANH;
 import static org.apache.calcite.sql.fun.SqlLibraryOperators.TIMESTAMP_MICROS;
 import static org.apache.calcite.sql.fun.SqlLibraryOperators.TIMESTAMP_MILLIS;
@@ -596,6 +597,7 @@ public class RexImpTable {
       defineMethod(STRUCT_ACCESS, BuiltInMethod.STRUCT_ACCESS.method, NullPolicy.ANY);
       defineMethod(MEMBER_OF, BuiltInMethod.MEMBER_OF.method, NullPolicy.NONE);
       defineMethod(ARRAY_REVERSE, BuiltInMethod.ARRAY_REVERSE.method, NullPolicy.STRICT);
+      defineMethod(SUBSTRING_INDEX, BuiltInMethod.SUBSTRING_INDEX.method, NullPolicy.STRICT);
       map.put(ARRAY_CONCAT, new ArrayConcatImplementor());
       final MethodImplementor isEmptyImplementor =
           new MethodImplementor(BuiltInMethod.IS_EMPTY.method, NullPolicy.NONE,
