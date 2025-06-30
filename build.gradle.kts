@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "io.dingodb"
-version = "1.33.0-SNAPSHOT"
+version = project.property("calcite.version") as String
 
 repositories {
     gradlePluginPortal()
