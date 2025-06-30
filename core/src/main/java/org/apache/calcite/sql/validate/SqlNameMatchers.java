@@ -123,7 +123,7 @@ public class SqlNameMatchers {
     }
 
     @Override public @Nullable RelDataTypeField field(RelDataType rowType, String fieldName) {
-      return rowType.getField(fieldName, caseSensitive, false);
+      return rowType.getField(fieldName, false, false);
     }
 
     @Override public int frequency(Iterable<String> names, String name) {
