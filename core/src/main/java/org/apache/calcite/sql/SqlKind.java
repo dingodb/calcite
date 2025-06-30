@@ -882,6 +882,9 @@ public enum SqlKind {
   /** The {@code ARRAY_CONCAT_AGG} aggregate function. */
   ARRAY_CONCAT_AGG,
 
+  /** {@code SUBSTRING_INDEX} function (Spark semantics). */
+  SUBSTRING_INDEX,
+
   /** The {@code GROUP_CONCAT} aggregate function. */
   GROUP_CONCAT,
 
