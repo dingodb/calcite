@@ -95,12 +95,12 @@ publishing {
             url = if (version.toString().endsWith("SNAPSHOT")) {
                 uri("https://central.sonatype.com/repository/maven-snapshots/")
             } else {
-                uri("https://ossrh-staging-api.central.sonatype.com/service/local/");
+                uri("https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/");
             }
 
             credentials {
-                username = System.getenv("MAVEN_USERNAME")
-                password = System.getenv("MAVEN_TOKEN")
+                username = System.getenv("mavenCentralUsername")
+                password = System.getenv("mavenCentralPassword")
             }
         }
     }

@@ -239,6 +239,7 @@ public class SqlToRelConverter {
    * @param rexBuilder      Rex builder
    * @param convertletTable Expression converter
    */
+  @Deprecated // to be removed before 2.0
   public SqlToRelConverter(
       RelOptTable.ViewExpander viewExpander,
       SqlValidator validator,
