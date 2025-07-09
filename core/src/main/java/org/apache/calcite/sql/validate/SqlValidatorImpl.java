@@ -1377,6 +1377,20 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
         if (newOperand != null && newOperand != operand) {
           call.setOperand(i, newOperand);
         }
+        if (kind == SqlKind.OTHER_FUNCTION
+            && call instanceof SqlBasicCall
+            && newOperand.getKind() == SqlKind.IDENTIFIER) {
+          String operator = call.getOperator().getName().toUpperCase();
+          switch (operator) {
+            case "NEXTVAL":
+            case "CURRVAL":
+            case "LASTVAL":
+            case "SETVAL":
+              newOperand = SqlLiteral.createCharString(newOperand.toString(), newOperand.getParserPosition());
+              call.setOperand(i, newOperand);
+              break;
+          }
+        }
       }
 
       if (call.getOperator() instanceof SqlUnresolvedFunction) {
