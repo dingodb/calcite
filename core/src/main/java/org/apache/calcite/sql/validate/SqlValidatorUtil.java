@@ -1390,12 +1390,19 @@ public class SqlValidatorUtil {
      * expressions. For example, calls to the {@code TUMBLE} functions. */
     final List<SqlNode> extraExprs = new ArrayList<>();
     final List<SqlNode> measureExprs = new ArrayList<>();
-    final List<SqlNode> groupExprs = new ArrayList<>();
+    List<SqlNode> groupExprs;
     final Map<Integer, Integer> groupExprProjection = new HashMap<>();
     final List<ImmutableBitSet> flatGroupSets = new ArrayList<>();
+    GroupAnalyzer(List<SqlNode> groupExprs) {
+      this.groupExprs = groupExprs;
+    }
+
+    GroupAnalyzer() {
+      this.groupExprs = new ArrayList<>();
+    }
 
     AggregatingSelectScope.Resolved finish() {
-      return new AggregatingSelectScope.Resolved(extraExprs, measureExprs,
+      return new AggregatingSelectScope.Resolved(extraExprs,
           groupExprs, flatGroupSets, groupExprProjection);
     }
   }

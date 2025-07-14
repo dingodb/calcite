@@ -3295,6 +3295,10 @@ public class SqlToRelConverter {
     SqlNode having = select.getHaving();
 
     final AggConverter aggConverter = new AggConverter(bb, select);
+    if (this.validator instanceof SqlValidatorImpl) {
+      SqlValidatorImpl sqlValidator = (SqlValidatorImpl) this.validator;
+      having = sqlValidator.validatedExpandingHaving(select);
+    }
     createAggImpl(bb, aggConverter, selectList, groupList, having,
         orderExprList);
   }
@@ -3403,10 +3407,15 @@ public class SqlToRelConverter {
             bb.scope.getMonotonicity(groupItem));
       }
 
-      // Add the aggregator
-      bb.setRoot(
-          createAggregate(bb, r.groupSet, r.groupSets.asList(),
-              aggConverter.getAggCalls()), false);
+      // Does this statement only contain HAVING? in this case it is not an Aggregation actually
+      boolean isHavingOnly = r.groupSet.isEmpty() && aggConverter.getAggCalls().stream()
+              .allMatch(c -> c.getAggregation() == SqlStdOperatorTable.__FIRST_VALUE);
+      if (!isHavingOnly) {
+        // Add the aggregator
+        bb.setRoot(
+                createAggregate(bb, r.groupSet, r.groupSets.asList(),
+                        aggConverter.getAggCalls()), false);
+      }
       bb.mapRootRelToFieldProjection.put(bb.root(), r.groupExprProjection);
 
       // Replace sub-queries in having here and modify having to use
@@ -3464,7 +3473,9 @@ public class SqlToRelConverter {
 
     // implement HAVING (we have already checked that it is non-trivial)
     relBuilder.push(bb.root());
-    relBuilder.filter(havingExpr);
+    if (havingExpr != null) {
+      relBuilder.filter(havingExpr);
+    }
 
     // implement the SELECT list
     relBuilder.project(Pair.left(projects), Pair.right(projects))

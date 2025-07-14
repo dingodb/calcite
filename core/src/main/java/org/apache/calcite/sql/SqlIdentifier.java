@@ -333,6 +333,11 @@ public class SqlIdentifier extends SqlNode {
     return names.get(0);
   }
 
+  public String getLastName() {
+    assert names.size() != 0;
+    return names.get(names.size() - 1);
+  }
+
   /** Returns the simple names in a list of identifiers.
    * Assumes that the list consists of are not-null, simple identifiers. */
   public static List<String> simpleNames(List<? extends SqlNode> list) {

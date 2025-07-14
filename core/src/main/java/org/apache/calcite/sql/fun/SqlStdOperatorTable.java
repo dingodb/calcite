@@ -1096,6 +1096,8 @@ public class SqlStdOperatorTable extends ReflectiveSqlOperatorTable {
   public static final SqlAggFunction SINGLE_VALUE =
       new SqlSingleValueAggFunction(castNonNull(null));
 
+  public static final SqlAggFunction __FIRST_VALUE = new SqlInternalFirstValueAggFunction();
+
   /**
    * <code>AVG</code> aggregate function.
    */
