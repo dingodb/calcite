@@ -1224,6 +1224,23 @@ public abstract class SqlUtil {
     return op.createCall(pos, leftNode, rightNode);
   }
 
+  /**
+   * If an identifier is a legitimate call to a function which has no
+   * arguments and requires no parentheses (for example "CURRENT_USER"),
+   * returns a call to that function, otherwise returns null.
+   */
+  public static SqlCall makeCall(
+          SqlOperatorTable opTab,
+          SqlIdentifier id) {
+    if (id.names.size() == 2 || id.names.size() == 3) {
+
+      int idNamesSize = id.names.size();
+      String funcName = id.names.get(idNamesSize - 1);
+      // todo
+    }
+    return null;
+  }
+
   //~ Inner Classes ----------------------------------------------------------
 
   /**

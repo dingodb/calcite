@@ -157,6 +157,7 @@ import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
 import static org.apache.calcite.linq4j.Nullness.castNonNull;
+import static org.apache.calcite.sql.SqlKind.AS;
 import static org.apache.calcite.sql.SqlUtil.stripAs;
 import static org.apache.calcite.sql.type.NonNullableAccessors.getCharset;
 import static org.apache.calcite.sql.type.NonNullableAccessors.getCollation;
@@ -1365,7 +1366,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
         boolean childUnderFrom;
         if (kind == SqlKind.SELECT) {
           childUnderFrom = i == SqlSelect.FROM_OPERAND;
-        } else if (kind == SqlKind.AS && (i == 0)) {
+        } else if (kind == AS && (i == 0)) {
           // for an aliased expression, it is under FROM if
           // the AS expression is under FROM
           childUnderFrom = underFrom;
@@ -2079,7 +2080,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
       } else {
         setValidatedNodeType(elseOperand, returnType);
       }
-    } else if (node.getKind()  == SqlKind.AS) {
+    } else if (node.getKind()  == AS) {
       // For AS operator, only infer the operand not the alias
       inferUnknownTypes(inferredType, scope, ((SqlCall) node).operand(0));
     } else if (node instanceof SqlCall) {
@@ -3156,6 +3157,11 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
       }
     }
     return false;
+  }
+
+  public boolean isAggregate(SqlNode selectNode, SqlIdentifier id) {
+    // [mysql behavior]
+    return aggFinder.findAgg(selectNode, id) != null;
   }
 
   protected boolean isNestedAggregateWindow(SqlNode node) {
@@ -4615,6 +4621,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
             false);
       }
     }
+    expandSelectItemWithNotInGroupBy(expandedSelectItems, selectScope);
 
     select.setSelectList(new SqlNodeList(expandedSelectItems, SqlParserPos.ZERO));
     // Create the new select list with expanded items.  Pass through
@@ -5870,7 +5877,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
   /** Returns the alias of a "expr AS alias" expression. */
   private static String alias(SqlNode item) {
     assert item instanceof SqlCall;
-    assert item.getKind() == SqlKind.AS;
+    assert item.getKind() == AS;
     final SqlIdentifier identifier = ((SqlCall) item).operand(1);
     return identifier.getSimple();
   }
@@ -6260,6 +6267,39 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
     }
   }
 
+  public SqlNode validatedExpandingHaving(SqlSelect select) {
+    SqlNode having = select.getHaving();
+
+    if (having == null) {
+      return having;
+    }
+
+    if (getConformance().isHavingAlias()) {
+      final SqlValidatorScope havingScope = getHavingScope(select);
+      SqlNode newExpr = expandGroupByOrHavingExpr(having, havingScope, select, true);
+      if (having != newExpr) {
+        having = newExpr;
+      }
+      inferUnknownTypes(
+              booleanType,
+              havingScope,
+              having);
+      having.validate(this, havingScope);
+    }
+    return having;
+  }
+
+  public SqlNode expandGroupByOrHavingExpr(SqlNode expr,
+                                           SqlValidatorScope scope, SqlSelect select, boolean havingExpression) {
+    final Expander expander = new ExtendedExpander(this, scope, select, expr,
+            havingExpression);
+    SqlNode newExpr = expr.accept(expander);
+    if (expr != newExpr) {
+      setOriginal(newExpr, expr);
+    }
+    return newExpr;
+  }
+
   public SqlNode expandSelectExpr(SqlNode expr,
       SelectScope scope, SqlSelect select) {
     final Expander expander = new SelectExpander(this, scope, select);
@@ -6424,6 +6464,49 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
     return isPhysicalNavigation(kind)
         || isLogicalNavigation(kind)
         || isAggregation(kind);
+  }
+
+    private void expandSelectItemWithNotInGroupBy(List<SqlNode> selectItems, SqlValidatorScope scope) {
+        if (!(scope instanceof AggregatingSelectScope)) {
+            return;
+        }
+        AggregatingSelectScope aggScope = (AggregatingSelectScope) scope;
+        for (int i = 0; i < selectItems.size(); i++) {
+            SqlNode item = selectItems.get(i);
+            if (aggScope.isNotGroupExpr(item)) {
+                SqlNode sqlNode = null;
+                SqlNode sqlNodeAs = null;
+                if (item.getKind() == SqlKind.AS) {
+                    SqlCall as = (SqlCall) item;
+                    sqlNode = as.operand(0);
+                    sqlNodeAs = as.operand(1);
+                } else {
+                    sqlNode = item;
+                    sqlNodeAs = new SqlIdentifier(SqlValidatorUtil.getAlias(item, 0), SqlParserPos.ZERO);
+                }
+                final SqlNode newNode = aggScope.replaceNotGroupExpr(sqlNode);
+                selectItems.set(i, SqlStdOperatorTable.AS.createCall(newNode.getParserPosition(),
+                        newNode, new SqlIdentifier(SqlValidatorUtil.getAlias(sqlNodeAs, 0), SqlParserPos.ZERO)));
+
+            }
+
+        }
+    }
+
+  private static SqlNode expandIdentifierInHavingNotInGroupBy(SqlNode identifier, SqlValidatorScope scope) {
+    if (!(scope instanceof AggregatingSelectScope)) {
+      return identifier;
+    }
+    AggregatingSelectScope aggScope = (AggregatingSelectScope) scope;
+
+    if (aggScope.isNotGroupExpr(identifier)) {
+
+      final SqlNode newNode = aggScope.replaceNotGroupExpr(identifier);
+      return newNode;
+
+    }
+    return identifier;
+
   }
 
   //~ Inner Classes ----------------------------------------------------------
@@ -6885,6 +6968,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
   static class ExtendedExpander extends Expander {
     final SqlSelect select;
     final SqlNode root;
+    final boolean havingExpr;
     final Clause clause;
     // Retain only expandable aliases or ordinals to prevent their expansion in a SQL call expr.
     final Set<SqlNode> aliasOrdinalExpandSet = Sets.newIdentityHashSet();
@@ -6898,62 +6982,132 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
       if (clause == Clause.GROUP_BY) {
         addExpandableExpressions();
       }
+      this.havingExpr = false;
+    }
+
+    ExtendedExpander(SqlValidatorImpl validator, SqlValidatorScope scope,
+                     SqlSelect select, SqlNode root, boolean havingExpr) {
+      super(validator, scope);
+      this.select = select;
+      this.root = root;
+      this.havingExpr = havingExpr;
+      this.clause = null;
+    }
+
+    private boolean selectItemsContainsHavingIdentifier(SqlIdentifier id) {
+      SqlNodeList selectList = select.getSelectList();
+      if (selectList != null) {
+        for (SqlNode sqlNode : selectList) {
+          if (checkIdentifierExist(id, sqlNode)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    private boolean checkIdentifierExist(SqlIdentifier id, SqlNode sqlNode) {
+      if (sqlNode != null) {
+        if (sqlNode instanceof SqlIdentifier) {
+          return ((SqlIdentifier) sqlNode).getLastName().equalsIgnoreCase(id.getLastName());
+        }
+        if (sqlNode instanceof SqlCall && ((SqlCall) sqlNode).getKind().equals(AS)) {
+          List<SqlNode> operandList = ((SqlCall) sqlNode).getOperandList();
+          if (operandList.size() == 2) {
+            return checkIdentifierExist(id, operandList.get(0)) || checkIdentifierExist(id,
+                    operandList.get(1));
+          }
+        }
+      }
+      return false;
+    }
+
+    private boolean groupByColumnContainsHavingIdentifier(SqlIdentifier id) {
+      SqlNodeList groupList = select.getGroup();
+      if (groupList != null) {
+        for (SqlNode sqlNode : groupList) {
+          if (sqlNode instanceof SqlIdentifier) {
+            String groupByColumnName = ((SqlIdentifier) sqlNode).getLastName();
+            if (groupByColumnName.equalsIgnoreCase(id.getLastName())) {
+              return true;
+            }
+          }
+        }
+      }
+      return false;
     }
 
     @Override public @Nullable SqlNode visit(SqlIdentifier id) {
-      if (!id.isSimple()) {
-        return super.visit(id);
-      }
-
-      final boolean replaceAliases = clause.shouldReplaceAliases(validator.config);
-      if (!replaceAliases || (clause == Clause.GROUP_BY && !aliasOrdinalExpandSet.contains(id))) {
-        final SelectScope scope = validator.getRawSelectScopeNonNull(select);
-        SqlNode node = expandCommonColumn(select, id, scope, validator);
-        if (node != id) {
-          return node;
+      if ((id.isSimple() || id.names.size() == 2)
+              && (havingExpr
+              ? validator.getConformance().isHavingAlias()
+              : validator.getConformance().isGroupByAlias())) {
+        String name;
+        if (id.isSimple()) {
+          name = id.getSimple();
+        } else {
+          name = id.names.get(1);
         }
-        return super.visit(id);
-      }
+        SqlNode expr = null;
+        final SqlNameMatcher nameMatcher =
+                validator.catalogReader.nameMatcher();
 
-      String name = id.getSimple();
-      SqlNode expr = null;
-      final SqlNameMatcher nameMatcher =
-          validator.catalogReader.nameMatcher();
-      int n = 0;
-      for (SqlNode s : SqlNonNullableAccessors.getSelectList(select)) {
-        final @Nullable String alias = SqlValidatorUtil.alias(s);
-        if (alias != null && nameMatcher.matches(alias, name)) {
-          expr = s;
-          n++;
+        // [mysql behavior]
+        if (havingExpr) {
+          if (groupByColumnContainsHavingIdentifier(id)) {
+            // table with columns (col0, col1, col2)
+            // SELECT 12 AS col2 FROM table GROUP BY col2, col1 HAVING 33 <= col2
+            // use group by scope or table scope
+            // because group by contains col2, so having scope should be group by scope or table scope
+            // no try catch, if group by column contains having Identifier, must by no exception
+            SqlNode result = super.visit(id);
+            return result;
+          } else {
+            if (!selectItemsContainsHavingIdentifier(id)) {
+              SqlNode result = super.visit(id);
+              return expandIdentifierInHavingNotInGroupBy(result, getScope());
+            }
+            // SELECT 12 AS col2 FROM table GROUP BY col1 HAVING 33 <= col2
+            // use select scope
+            // because group by contains col2, so having scope should be select scope
+            // so do nothing
+          }
+        } else {
+          // select 1 as col2, - col2 as col2 from table group by col2;
+          // table columns contains col2, so we need to group by table's col2 instead of select alias col2
+          try {
+            SqlNode result = super.visit(id);
+            return result;
+          } catch (Throwable throwable) {
+            // pass, maybe table doesn't contain col2, use select alias col2.
+          }
         }
-      }
-
-      if (n == 0) {
-        return super.visit(id);
-      } else if (n > 1) {
-        // More than one column has this alias.
-        throw validator.newValidationError(id,
-              RESOURCE.columnAmbiguous(name));
-      }
-      Iterable<SqlCall> allAggList = validator.aggFinder.findAll(ImmutableList.of(root));
-      for (SqlCall agg : allAggList) {
-        if (clause == Clause.HAVING && containsIdentifier(agg, id)) {
+        int n = 0;
+        for (SqlNode s : select.getSelectList()) {
+          final String alias = SqlValidatorUtil.getAlias(s, -1);
+          if (alias != null && nameMatcher.matches(alias, name)) {
+            expr = s;
+            n++;
+          }
+        }
+        if (n == 0) {
           return super.visit(id);
         }
+        // [mysql behavior]
+        if (havingExpr && validator.isAggregate(root, id)) {
+          return super.visit(id);
+        }
+        expr = stripAs(expr);
+        if (expr instanceof SqlIdentifier) {
+          expr = getScope().fullyQualify((SqlIdentifier) expr).identifier;
+        }
+        return expr;
       }
-
-      expr = stripAs(expr);
-      if (expr instanceof SqlIdentifier) {
-        SqlIdentifier sid = (SqlIdentifier) expr;
-        final SqlIdentifier fqId = getScope().fullyQualify(sid).identifier;
-        expr = expandDynamicStar(sid, fqId);
-      }
-
-      return expr;
+      return super.visit(id);
     }
 
     @Override public @Nullable SqlNode visit(SqlLiteral literal) {
-      if (clause != Clause.GROUP_BY
+      if (havingExpr
               || !validator.config().conformance().isGroupByOrdinal()) {
         return super.visit(literal);
       }

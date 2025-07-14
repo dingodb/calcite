@@ -127,23 +127,7 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 import org.immutables.value.Value;
 
 import java.math.BigDecimal;
-import java.util.AbstractList;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.BitSet;
-import java.util.Collections;
-import java.util.Deque;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.SortedSet;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
@@ -176,11 +160,13 @@ import static java.util.Objects.requireNonNull;
 public class RelBuilder {
   protected final RelOptCluster cluster;
   protected final @Nullable RelOptSchema relOptSchema;
+  private final RelFactories.ProjectFactory projectFactory;
   private final Deque<Frame> stack = new ArrayDeque<>();
   private RexSimplify simplifier;
   private final Config config;
   private final RelOptTable.ViewExpander viewExpander;
   private RelFactories.Struct struct;
+  private final boolean simplify;
 
   protected RelBuilder(@Nullable Context context, RelOptCluster cluster,
       @Nullable RelOptSchema relOptSchema) {
@@ -189,6 +175,10 @@ public class RelBuilder {
     if (context == null) {
       context = Contexts.EMPTY_CONTEXT;
     }
+    this.simplify = Hook.REL_BUILDER_SIMPLIFY.get(false);
+    this.projectFactory =
+            Util.first(context.unwrap(RelFactories.ProjectFactory.class),
+                    RelFactories.DEFAULT_PROJECT_FACTORY);
     this.config = getConfig(context);
     this.viewExpander = getViewExpander(cluster, context);
     this.struct =
@@ -2064,13 +2054,90 @@ public class RelBuilder {
       return values(Collections.nCopies(values.tuples.size(), tuple),
           typeBuilder.build());
     }
-
     final RelNode project =
         struct.projectFactory.createProject(frame.rel,
             ImmutableList.copyOf(hints),
             ImmutableList.copyOf(nodeList),
             fieldNameList,
             variables);
+    stack.pop();
+    stack.push(new Frame(project, fields.build()));
+    return this;
+  }
+
+  public RelBuilder project(
+          Iterable<? extends RexNode> nodes,
+          Iterable<String> fieldNames,
+          List<String> originalNames,
+          boolean force,
+          Set<CorrelationId> var) {
+    final List<String> names = new ArrayList<>();
+    final List<RexNode> exprList = new ArrayList<>();
+    final Iterator<String> nameIterator = fieldNames.iterator();
+    for (RexNode node : nodes) {
+      if (simplify) {
+        node = simplifier.simplifyPreservingType(node);
+      }
+      exprList.add(node);
+      String name = nameIterator.hasNext() ? nameIterator.next() : null;
+      names.add(name != null ? name : inferAlias(exprList, node));
+    }
+
+    if (originalNames == null || originalNames.size() == 0) {
+      originalNames = new ArrayList<>(names);
+    }
+
+    final Frame frame = stack.peek();
+    final ImmutableList.Builder<Field> fields = ImmutableList.builder();
+    final Set<String> uniqueNameList =
+            getTypeFactory().getTypeSystem().isSchemaCaseSensitive()
+                    ? new HashSet<String>()
+                    : new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+    // calculate final names and build field list
+    for (int i = 0; i < names.size(); ++i) {
+      RexNode node = exprList.get(i);
+      String name = names.get(i);
+      Field field;
+      if (name == null || uniqueNameList.contains(name)) {
+        int j = 0;
+        if (name == null) {
+          j = i;
+        }
+        do {
+          name = SqlValidatorUtil.F_SUGGESTER.apply(name, j, j++);
+        } while(uniqueNameList.contains(name));
+        names.set(i, name);
+      }
+      RelDataTypeField fieldType =
+              new RelDataTypeFieldImpl(name, i, node.getType());
+      switch (node.getKind()) {
+        case INPUT_REF:
+          // preserve rel aliases for INPUT_REF fields
+          final int index = ((RexInputRef) node).getIndex();
+          field = new Field(frame.fields.get(index).left, fieldType);
+          break;
+        default:
+          field = new Field(ImmutableSet.<String>of(), fieldType);
+          break;
+      }
+      uniqueNameList.add(name);
+      fields.add(field);
+    }
+    final RelDataType inputRowType = peek().getRowType();
+    if (!force && RexUtil.isIdentity(exprList, inputRowType)) {
+      if (names.equals(inputRowType.getFieldNames())) {
+        // Do not create an identity project if it does not rename any fields
+        return this;
+      } else {
+        // create "virtual" row type for project only rename fields
+        stack.pop();
+        stack.push(new Frame(frame.rel, fields.build()));
+        return this;
+      }
+    }
+    final RelNode project =
+            projectFactory.createProject(frame.rel, ImmutableList.of(), ImmutableList.copyOf(exprList),
+                    names, var);
     stack.pop();
     stack.push(new Frame(project, fields.build()));
     return this;
@@ -2219,6 +2286,34 @@ public class RelBuilder {
     }
 
     return project(fields(), newFieldNames, true);
+  }
+
+  /** Infers the alias of an expression.
+   *
+   * <p>If the expression was created by {@link #alias}, replaces the expression
+   * in the project list.
+   */
+  private String inferAlias(List<RexNode> exprList, RexNode expr) {
+    switch (expr.getKind()) {
+      case INPUT_REF:
+        final RexInputRef ref = (RexInputRef) expr;
+        return stack.peek().fields.get(ref.getIndex()).getValue().getName();
+      case CAST:
+        return inferAlias(exprList, ((RexCall) expr).getOperands().get(0));
+      case AS:
+        final RexCall call = (RexCall) expr;
+        for (;;) {
+          final int i = exprList.indexOf(expr);
+          if (i < 0) {
+            break;
+          }
+          exprList.set(i, call.getOperands().get(0));
+        }
+        return ((NlsString) ((RexLiteral) call.getOperands().get(1)).getValue())
+                .getValue();
+      default:
+        return null;
+    }
   }
 
   /** Infers the alias of an expression.

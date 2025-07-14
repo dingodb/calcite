@@ -703,6 +703,8 @@ public enum SqlKind {
   /** {@code JSON_ARRAYAGG} aggregate function. */
   JSON_ARRAYAGG,
 
+  __FIRST_VALUE,
+
   /** {@code JSON_OBJECTAGG} aggregate function. */
   JSON_OBJECTAGG,
 

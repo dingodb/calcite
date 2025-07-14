@@ -16,10 +16,7 @@
  */
 package org.apache.calcite.sql.validate;
 
-import org.apache.calcite.sql.SqlCall;
-import org.apache.calcite.sql.SqlNode;
-import org.apache.calcite.sql.SqlNodeList;
-import org.apache.calcite.sql.SqlOperatorTable;
+import org.apache.calcite.sql.*;
 import org.apache.calcite.util.Util;
 
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -32,6 +29,9 @@ import java.util.List;
  * {@link SqlNode} objects and throws {@link Util.FoundOne} when it finds
  * one. */
 class AggFinder extends AggVisitor {
+
+  private SqlIdentifier id = null;
+
   /**
    * Creates an AggFinder.
    *
@@ -63,6 +63,25 @@ class AggFinder extends AggVisitor {
     } catch (Util.FoundOne e) {
       Util.swallow(e, null);
       return (SqlCall) e.getNode();
+    }
+  }
+
+  /**
+   * Finds an aggregate.
+   *
+   * @param node Parse tree to search
+   * @return First aggregate function in parse tree, or null if not found
+   */
+  public SqlCall findAgg(SqlNode node, SqlIdentifier id) {
+    try {
+      this.id = id;
+      node.accept(this);
+      return null;
+    } catch (Util.FoundOne e) {
+      Util.swallow(e, null);
+      return (SqlCall) e.getNode();
+    } finally {
+      this.id = null;
     }
   }
 
