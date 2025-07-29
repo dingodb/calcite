@@ -303,8 +303,8 @@ public class SqlStdOperatorTable extends ReflectiveSqlOperatorTable {
           60,
           true,
           ReturnTypes.NULLABLE_MOD,
-          null,
-          OperandTypes.EXACT_NUMERIC_EXACT_NUMERIC);
+          InferTypes.FIRST_KNOWN,
+          OperandTypes.PERCENT_OPERATOR);
 
   /** The {@code RAND_INTEGER([seed, ] bound)} function, which yields a random
    * integer, optionally with seed. */

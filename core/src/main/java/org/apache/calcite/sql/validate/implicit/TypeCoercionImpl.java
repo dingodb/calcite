@@ -166,12 +166,23 @@ public class TypeCoercionImpl extends AbstractTypeCoercion {
           return false;
         }
       }
-      // Binary arithmetic operator like: + - * / %
+      // Binary arithmetic operator like: + - * /
       if (kind.belongsTo(SqlKind.BINARY_ARITHMETIC)) {
         coerced = binaryArithmeticWithStrings(binding, type1, type2);
+        coerced = coerced || binaryArithmeticForMysql(binding, type1, type2);
       }
     }
     return coerced;
+  }
+
+  /**
+   * For NUMERIC operands, cast operands to be compatible with mysql.
+   **/
+  protected boolean binaryArithmeticForMysql(
+      SqlCallBinding binding,
+      RelDataType left,
+      RelDataType right) {
+    return false;
   }
 
   /**
@@ -196,13 +207,26 @@ public class TypeCoercionImpl extends AbstractTypeCoercion {
       // max precision/scale DECIMAL.
       if (SqlTypeUtil.isDecimal(right)) {
         right = SqlTypeUtil.getMaxPrecisionScaleDecimal(factory);
+        return coerceOperandType(binding.getScope(), binding.getCall(), 0, right);
+      } else if(SqlTypeUtil.isInt(right) || SqlTypeUtil.isBigint(right)) {
+        //for string op int/bigint, the target type is double for mysql compatibility.
+        RelDataType target = SqlTypeUtil.getDouble(factory);  //To double.
+        coerceOperandType(binding.getScope(), binding.getCall(), 0, target);
+        coerceOperandType(binding.getScope(), binding.getCall(), 1, target);
+        return true;
       }
-      return coerceOperandType(binding.getScope(), binding.getCall(), 0, right);
     } else if (SqlTypeUtil.isNumeric(left) && SqlTypeUtil.isString(right)) {
       if (SqlTypeUtil.isDecimal(left)) {
         left = SqlTypeUtil.getMaxPrecisionScaleDecimal(factory);
+        return coerceOperandType(binding.getScope(), binding.getCall(), 1, left);
+      } else if(SqlTypeUtil.isInt(left) || SqlTypeUtil.isBigint(left)) {
+        //for int/bigint op string, the target type is double for mysql compatibility.
+        RelDataType target = SqlTypeUtil.getDouble(factory);  //To double.
+        coerceOperandType(binding.getScope(), binding.getCall(), 0, target);
+        coerceOperandType(binding.getScope(), binding.getCall(), 1, target);
+        return true;
       }
-      return coerceOperandType(binding.getScope(), binding.getCall(), 1, left);
+
     }
     return false;
   }

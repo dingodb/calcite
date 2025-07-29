@@ -855,6 +855,9 @@ public abstract class OperandTypes {
   public static final SqlSingleOperandTypeChecker DIVISION_OPERATOR =
       NUMERIC_NUMERIC.or(INTERVAL_NUMERIC);
 
+  public static final SqlSingleOperandTypeChecker PERCENT_OPERATOR =
+          NUMERIC_NUMERIC.or(INTERVAL_NUMERIC);
+
   public static final SqlSingleOperandTypeChecker MINUS_OPERATOR =
       // TODO:  compatibility check
       NUMERIC_NUMERIC.or(INTERVAL_SAME_SAME).or(DATETIME_INTERVAL);
