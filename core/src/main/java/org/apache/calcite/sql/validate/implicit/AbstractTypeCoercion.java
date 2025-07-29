@@ -265,6 +265,11 @@ public abstract class AbstractTypeCoercion implements TypeCoercion {
       return false;
     }
 
+    //fast path.
+    if(SqlTypeUtil.isInt(fromType) && SqlTypeUtil.isBigint(toType)) {
+      return true;
+    }
+
     // No need to cast if the source type precedence list
     // contains target type. i.e. do not cast from
     // tinyint to int or int to bigint.

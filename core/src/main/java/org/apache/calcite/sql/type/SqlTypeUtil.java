@@ -495,6 +495,16 @@ public abstract class SqlTypeUtil {
     return typeName == SqlTypeName.DOUBLE;
   }
 
+  /** Returns whether a type is FLOAT. */
+  public static boolean isFloat(RelDataType type) {
+    SqlTypeName typeName = type.getSqlTypeName();
+    if (typeName == null) {
+      return false;
+    }
+    return typeName == SqlTypeName.FLOAT;
+  }
+
+
   /** Returns whether a type is BIGINT. */
   public static boolean isBigint(RelDataType type) {
     SqlTypeName typeName = type.getSqlTypeName();
@@ -502,6 +512,15 @@ public abstract class SqlTypeUtil {
       return false;
     }
     return typeName == SqlTypeName.BIGINT;
+  }
+
+  /** Returns whether a type is INT. */
+  public static boolean isInt(RelDataType type) {
+    SqlTypeName typeName = type.getSqlTypeName();
+    if (typeName == null) {
+      return false;
+    }
+    return typeName == SqlTypeName.INTEGER;
   }
 
   /** Returns whether a type is numeric with exact precision. */
@@ -1797,6 +1816,12 @@ public abstract class SqlTypeUtil {
     int scale = maxPrecision / 2;
     scale = scale > 30 ? 30 : scale;
     return factory.createSqlType(SqlTypeName.DECIMAL, maxPrecision, scale);
+  }
+
+  /** Get double type.
+   */
+  public static RelDataType getDouble(RelDataTypeFactory factory) {
+    return factory.createSqlType(SqlTypeName.DOUBLE);
   }
 
   /**
