@@ -230,7 +230,7 @@ public class HintStrategyTable {
     public static final HintErrorLogger INSTANCE = new HintErrorLogger();
 
     @Override public boolean fail(@Nullable String message, @Nullable Object... args) {
-      LOGGER.warn(requireNonNull(message, "message"), args);
+      //LOGGER.warn(requireNonNull(message, "message"), args);
       return false;
     }
   }
