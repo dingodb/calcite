@@ -233,23 +233,23 @@ public class RexToLixTranslator implements RexVisitor<RexToLixTranslator.Result>
         null, new RexBuilder(typeFactory), conformance, null);
   }
 
-  Expression translate(RexNode expr) {
+  public Expression translate(RexNode expr) {
     final RexImpTable.NullAs nullAs =
         RexImpTable.NullAs.of(isNullable(expr));
     return translate(expr, nullAs);
   }
 
-  Expression translate(RexNode expr, RexImpTable.NullAs nullAs) {
+  public Expression translate(RexNode expr, RexImpTable.NullAs nullAs) {
     return translate(expr, nullAs, null);
   }
 
-  Expression translate(RexNode expr, @Nullable Type storageType) {
+  public Expression translate(RexNode expr, @Nullable Type storageType) {
     final RexImpTable.NullAs nullAs =
         RexImpTable.NullAs.of(isNullable(expr));
     return translate(expr, nullAs, storageType);
   }
 
-  Expression translate(RexNode expr, RexImpTable.NullAs nullAs,
+  public Expression translate(RexNode expr, RexImpTable.NullAs nullAs,
       @Nullable Type storageType) {
     currentStorageType = storageType;
     final Result result = expr.accept(this);
