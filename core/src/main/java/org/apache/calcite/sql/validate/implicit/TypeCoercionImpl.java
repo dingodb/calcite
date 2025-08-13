@@ -106,6 +106,7 @@ public class TypeCoercionImpl extends AbstractTypeCoercion {
     case VALUES:
       boolean coerceValues = false;
       for (SqlNode rowConstructor : ((SqlCall) query).getOperandList()) {
+        ((SqlCall) rowConstructor).getOperator().setCallContext(SqlOperator.CallContext.IN_VALUES);
         if (coerceOperandType(scope, (SqlCall) rowConstructor, columnIndex, targetType)) {
           coerceValues = true;
         }

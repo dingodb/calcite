@@ -4169,6 +4169,9 @@ public class SqlToRelConverter {
     bb.setRoot(sourceRel, false);
     ImmutableList.Builder<RexNode> rexNodeSourceExpressionListBuilder = ImmutableList.builder();
     for (SqlNode n : call.getSourceExpressionList()) {
+      if(n instanceof SqlBasicCall) {
+        ((SqlBasicCall)n).getOperator().setCallContext(SqlOperator.CallContext.IN_UPDATE_SOURCE);
+      }
       RexNode rn = bb.convertExpression(n);
       rexNodeSourceExpressionListBuilder.add(rn);
     }
@@ -4640,10 +4643,13 @@ public class SqlToRelConverter {
       replaceSubQueries(tmpBb, rowConstructor,
           RelOptUtil.Logic.TRUE_FALSE_UNKNOWN);
       final List<Pair<RexNode, String>> exps = new ArrayList<>();
-      Ord.forEach(rowConstructor.getOperandList(), (operand, i) ->
-          exps.add(
-              Pair.of(tmpBb.convertExpression(operand),
-                  SqlValidatorUtil.alias(operand, i))));
+      Ord.forEach(rowConstructor.getOperandList(), (operand, i) -> {
+            RexNode rexNode = tmpBb.convertExpression(operand);
+            exps.add(
+                Pair.of(rexNode,
+                    SqlValidatorUtil.alias(operand, i)));
+          }
+      );
       RelNode in =
           (null == tmpBb.root)
               ? LogicalValues.createOneRow(cluster)
