@@ -85,6 +85,8 @@ public abstract class SqlOperator {
    */
   public static final int MDX_PRECEDENCE = 200;
 
+  public static enum CallContext{INVALID, IN_VALUES, IN_UPDATE_SOURCE};
+
   //~ Instance fields --------------------------------------------------------
 
   /**
@@ -111,6 +113,8 @@ public abstract class SqlOperator {
    * left-associative.
    */
   private final int rightPrec;
+
+  private CallContext callContext;
 
   /** Used to infer the return type of a call to this operator. */
   private final @Nullable SqlReturnTypeInference returnTypeInference;
@@ -146,6 +150,7 @@ public abstract class SqlOperator {
     }
     this.operandTypeInference = operandTypeInference;
     this.operandTypeChecker = operandTypeChecker;
+    this.callContext = CallContext.INVALID;
   }
 
   /**
@@ -167,6 +172,7 @@ public abstract class SqlOperator {
         returnTypeInference,
         operandTypeInference,
         operandTypeChecker);
+    callContext = CallContext.INVALID;
   }
 
   //~ Methods ----------------------------------------------------------------
@@ -211,6 +217,14 @@ public abstract class SqlOperator {
 
   public String getName() {
     return name;
+  }
+
+  public void setCallContext(CallContext callContext) {
+    this.callContext = callContext;
+  }
+
+  public CallContext getCallContext() {
+    return callContext;
   }
 
   /**

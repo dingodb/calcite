@@ -22,14 +22,18 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeFactoryImpl;
 import org.apache.calcite.rel.type.RelDataTypeField;
+import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlCharStringLiteral;
 import org.apache.calcite.sql.SqlCollation;
 import org.apache.calcite.sql.SqlDynamicParam;
+import org.apache.calcite.sql.SqlFunction;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
+import org.apache.calcite.sql.SqlOperator;
+import org.apache.calcite.sql.fun.SqlCastFunction;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParserPos;
@@ -118,6 +122,12 @@ public abstract class AbstractTypeCoercion implements TypeCoercion {
     // Fix up nullable attr.
     RelDataType targetType1 = syncAttributes(operandType, targetType);
     SqlNode desired = castTo(operand, targetType1);
+
+    if(call instanceof SqlBasicCall &&  desired instanceof SqlBasicCall) {
+      if (((SqlBasicCall)call).getOperator().getCallContext() == SqlOperator.CallContext.IN_VALUES) {
+        ((SqlBasicCall)desired).getOperator().setCallContext(SqlOperator.CallContext.IN_VALUES);
+      }
+    }
     call.setOperand(index, desired);
     updateInferredType(desired, targetType1);
     return true;
@@ -294,7 +304,8 @@ public abstract class AbstractTypeCoercion implements TypeCoercion {
    * <p>Ignore constant reduction which should happen in RexSimplify.
    */
   private static SqlNode castTo(SqlNode node, RelDataType type) {
-    return SqlStdOperatorTable.CAST.createCall(SqlParserPos.ZERO, node,
+    SqlFunction castFunction = new SqlCastFunction();
+    return castFunction.createCall(SqlParserPos.ZERO, node,
         SqlTypeUtil.convertTypeToSpec(type).withNullable(type.isNullable()));
   }
 

@@ -56,6 +56,7 @@ import org.apache.calcite.sql.SqlWindowTableFunction;
 import org.apache.calcite.sql.fun.SqlArrayValueConstructor;
 import org.apache.calcite.sql.fun.SqlBetweenOperator;
 import org.apache.calcite.sql.fun.SqlCase;
+import org.apache.calcite.sql.fun.SqlCastFunction;
 import org.apache.calcite.sql.fun.SqlDatetimeSubtractionOperator;
 import org.apache.calcite.sql.fun.SqlExtractFunction;
 import org.apache.calcite.sql.fun.SqlInternalOperators;
@@ -648,7 +649,17 @@ public class StandardConvertletTable extends ReflectiveConvertletTable {
         type = typeFactory.createTypeWithNullability(type, isn);
       }
     }
-    return cx.getRexBuilder().makeCast(type, arg);
+
+    RexNode castNode = cx.getRexBuilder().makeCast(type, arg);
+    if (call instanceof SqlBasicCall &&
+        (((SqlBasicCall)call).getOperator().getCallContext() == SqlOperator.CallContext.IN_UPDATE_SOURCE ||
+            ((SqlBasicCall)call).getOperator().getCallContext() == SqlOperator.CallContext.IN_VALUES  )) {
+        if(castNode instanceof RexCall &&
+            ((RexCall)castNode).getOperator() instanceof SqlCastFunction) {
+          ((RexCall)castNode).getOperator().setCallContext(((SqlBasicCall)call).getOperator().getCallContext());
+        }
+      }
+    return castNode;
   }
 
   protected RexNode convertFloorCeil(SqlRexContext cx, SqlCall call) {
