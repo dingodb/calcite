@@ -185,7 +185,7 @@ public class EnumerableRelImplementor extends JavaRelImplementor {
         memberDeclarations);
   }
 
-  private static ClassDeclaration classDecl(
+  public static ClassDeclaration classDecl(
       JavaTypeFactoryImpl.SyntheticRecordType type) {
     ClassDeclaration classDeclaration =
         Expressions.classDecl(
@@ -489,11 +489,10 @@ public class EnumerableRelImplementor extends JavaRelImplementor {
   }
 
   /** Visitor that finds types in an {@link Expression} tree. */
-  @VisibleForTesting
-  static class TypeFinder extends VisitorImpl<Void> {
+  public static class TypeFinder extends VisitorImpl<Void> {
     private final Collection<Type> types;
 
-    TypeFinder(Collection<Type> types) {
+    public TypeFinder(Collection<Type> types) {
       this.types = types;
     }
 
@@ -549,7 +548,7 @@ public class EnumerableRelImplementor extends JavaRelImplementor {
   }
 
   /** Adds a declaration of each synthetic type found in a code block. */
-  private static class TypeRegistrar {
+  public static class TypeRegistrar {
     private final List<MemberDeclaration> memberDeclarations;
     private final Set<Type> seen = new HashSet<>();
 

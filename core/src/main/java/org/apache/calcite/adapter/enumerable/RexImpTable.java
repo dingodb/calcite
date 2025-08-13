@@ -1901,16 +1901,30 @@ public class RexImpTable {
 
       Expression rowInRange = winResult.rowInPartition(dstIndex);
 
+      Expression defaultValue = rexArgs.size() == 3
+            ? currentRowTranslator.translate(rexArgs.get(2), res.type)
+            : getDefaultValue(res.type);
       BlockBuilder thenBlock = result.nestBlock();
       Expression lagResult = winResult.rowTranslator(dstIndex).translate(
           rexArgs.get(0), res.type);
+      // for dingo start
+      if (lagResult instanceof ParameterExpression) {
+        ParameterExpression lagResult1 = (ParameterExpression) lagResult;
+        if ("java.lang.Object".equalsIgnoreCase(lagResult1.getType().getTypeName())
+            && "java.sql.Date".equalsIgnoreCase(res.getType().getTypeName())) {
+          lagResult = Expressions.convert_(
+                  lagResult1,
+                  java.sql.Date.class);
+        }
+      }
+      // for dingo end
       thenBlock.add(Expressions.statement(Expressions.assign(res, lagResult)));
       result.exitBlock();
       BlockStatement thenBranch = thenBlock.toBlock();
 
-      Expression defaultValue = rexArgs.size() == 3
-          ? currentRowTranslator.translate(rexArgs.get(2), res.type)
-          : getDefaultValue(res.type);
+      //Expression defaultValue = rexArgs.size() == 3
+      //    ? currentRowTranslator.translate(rexArgs.get(2), res.type)
+      //    : getDefaultValue(res.type);
 
       result.currentBlock().add(Expressions.declare(0, res, null));
       result.currentBlock().add(
