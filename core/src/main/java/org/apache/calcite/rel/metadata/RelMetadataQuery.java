@@ -85,6 +85,7 @@ public class RelMetadataQuery extends RelMetadataQueryBase {
 
   private BuiltInMetadata.Collation.Handler collationHandler;
   private BuiltInMetadata.ColumnOrigin.Handler columnOriginHandler;
+  private BuiltInMetadata.DmlColumnName.Handler dmlColumnNameHandler;
   private BuiltInMetadata.ExpressionLineage.Handler expressionLineageHandler;
   private BuiltInMetadata.TableReferences.Handler tableReferencesHandler;
   private BuiltInMetadata.ColumnUniqueness.Handler columnUniquenessHandler;
@@ -124,6 +125,7 @@ public class RelMetadataQuery extends RelMetadataQueryBase {
     super(provider);
     this.collationHandler = provider.handler(BuiltInMetadata.Collation.Handler.class);
     this.columnOriginHandler = provider.handler(BuiltInMetadata.ColumnOrigin.Handler.class);
+    this.dmlColumnNameHandler = provider.handler(BuiltInMetadata.DmlColumnName.Handler.class);
     this.expressionLineageHandler =
         provider.handler(BuiltInMetadata.ExpressionLineage.Handler.class);
     this.tableReferencesHandler = provider.handler(BuiltInMetadata.TableReferences.Handler.class);
@@ -159,6 +161,7 @@ public class RelMetadataQuery extends RelMetadataQueryBase {
     super(null);
     this.collationHandler = initialHandler(BuiltInMetadata.Collation.Handler.class);
     this.columnOriginHandler = initialHandler(BuiltInMetadata.ColumnOrigin.Handler.class);
+    this.dmlColumnNameHandler = initialHandler(BuiltInMetadata.DmlColumnName.Handler.class);
     this.expressionLineageHandler = initialHandler(BuiltInMetadata.ExpressionLineage.Handler.class);
     this.tableReferencesHandler = initialHandler(BuiltInMetadata.TableReferences.Handler.class);
     this.columnUniquenessHandler = initialHandler(BuiltInMetadata.ColumnUniqueness.Handler.class);
@@ -190,6 +193,7 @@ public class RelMetadataQuery extends RelMetadataQueryBase {
     super(metadataHandlerProvider);
     this.collationHandler = prototype.collationHandler;
     this.columnOriginHandler = prototype.columnOriginHandler;
+    this.dmlColumnNameHandler = prototype.dmlColumnNameHandler;
     this.expressionLineageHandler = prototype.expressionLineageHandler;
     this.tableReferencesHandler = prototype.tableReferencesHandler;
     this.columnUniquenessHandler = prototype.columnUniquenessHandler;
@@ -396,6 +400,27 @@ public class RelMetadataQuery extends RelMetadataQueryBase {
     }
     final RelColumnOrigin origin = Iterables.getOnlyElement(origins);
     return origin;
+  }
+
+  /**
+   * Returns the
+   * {@link BuiltInMetadata.DmlColumnName#getDmlColumnNames()}
+   * statistic.
+   *
+   * @param rel           the relational expression
+   * @return set of origin columns, or null if this information cannot be
+   * determined (whereas empty set indicates definitely no origin columns at
+   * all)
+   */
+  public List<Set<RelColumnOrigin>> getDmlColumnNames(RelNode rel) {
+    for (;;) {
+      try {
+        return dmlColumnNameHandler.getDmlColumnNames(rel, this);
+      } catch (JaninoRelMetadataProvider.NoHandler e) {
+        dmlColumnNameHandler =
+                revise(e.relClass, BuiltInMetadata.DmlColumnName.DEF);
+      }
+    }
   }
 
   /**

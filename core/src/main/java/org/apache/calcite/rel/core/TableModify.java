@@ -16,6 +16,9 @@
  */
 package org.apache.calcite.rel.core;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Streams;
+import org.apache.calcite.linq4j.Ord;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
@@ -33,15 +36,18 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.*;
+import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.type.SqlTypeUtil;
 
 import com.google.common.base.Preconditions;
 
+import org.apache.calcite.util.Util;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
@@ -80,10 +86,15 @@ public abstract class TableModify extends SingleRel {
    */
   protected final RelOptTable table;
   private final Operation operation;
-  private final @Nullable List<String> updateColumnList;
-  private final @Nullable List<RexNode> sourceExpressionList;
+  private final List<String> updateColumnList;
+  private final List<RexNode> sourceExpressionList;
   private @MonotonicNonNull RelDataType inputRowType;
   private final boolean flattened;
+
+  protected List<RelOptTable> tables;
+  protected TableInfo tableInfo;
+  protected List<String> sourceTableNames;
+  protected List<String> targetTableNames;
 
   //~ Constructors -----------------------------------------------------------
 
@@ -114,9 +125,10 @@ public abstract class TableModify extends SingleRel {
       Prepare.CatalogReader catalogReader,
       RelNode input,
       Operation operation,
-      @Nullable List<String> updateColumnList,
-      @Nullable List<RexNode> sourceExpressionList,
-      boolean flattened) {
+      List<String> updateColumnList,
+      List<RexNode> sourceExpressionList,
+      boolean flattened,
+      TableInfo tableInfo) {
     super(cluster, traitSet, input);
     this.table = table;
     this.catalogReader = catalogReader;
@@ -141,6 +153,34 @@ public abstract class TableModify extends SingleRel {
       cluster.getPlanner().registerSchema(relOptSchema);
     }
     this.flattened = flattened;
+    this.tableInfo = tableInfo;
+    if (tableInfo != null) {
+      this.tables = tableInfo.getRefTables();
+      this.sourceTableNames = tableInfo.getRefTableNames();
+      this.targetTableNames = tableInfo.getTargetTableNames();
+    }
+  }
+
+  protected TableModify(
+      RelOptCluster cluster,
+      RelTraitSet traitSet,
+      RelOptTable table,
+      Prepare.CatalogReader catalogReader,
+      RelNode input,
+      Operation operation,
+      List<String> updateColumnList,
+      List<RexNode> sourceExpressionList,
+      boolean flattened) {
+    this(cluster,
+        traitSet,
+        table,
+        catalogReader,
+        input,
+        operation,
+        updateColumnList,
+        sourceExpressionList,
+        flattened,
+        TableInfo.singleSource(table));
   }
 
   /**
@@ -157,7 +197,9 @@ public abstract class TableModify extends SingleRel {
         requireNonNull(input.getEnum("operation", Operation.class), "operation"),
         input.getStringList("updateColumnList"),
         input.getExpressionList("sourceExpressionList"),
-        input.getBoolean("flattened", false));
+        input.getBoolean("flattened", false),
+        TableInfo.singleSource(input.getTable("table"))
+    );
   }
 
   //~ Methods ----------------------------------------------------------------
@@ -218,11 +260,29 @@ public abstract class TableModify extends SingleRel {
     final RelDataType rowType = table.getRowType();
     switch (operation) {
     case UPDATE:
-      assert updateColumnList != null : "updateColumnList must not be null for " + operation;
-      inputRowType =
-          typeFactory.createJoinType(rowType,
-              getCatalogReader().createTypeFromProjection(rowType,
-                  updateColumnList));
+      if (tables.size() <= 1) {
+        inputRowType = typeFactory.createJoinType(rowType,
+                getCatalogReader().createTypeFromProjection(rowType, updateColumnList));
+      } else {
+        final Map<String, RelOptTable> tableRelMap = new HashMap<>();
+        tableRelMap.put(Util.last(tables.get(0).getQualifiedName()), tables.get(0));
+
+        RelDataType tmpRowType = tables.get(0).getRowType();
+        for (int i = 1; i < tables.size(); i++) {
+          tmpRowType = typeFactory.createJoinType(tmpRowType, tables.get(0).getRowType());
+          tableRelMap.put(Util.last(tables.get(i).getQualifiedName()), tables.get(i));
+        }
+
+        for (int j = 0; j < updateColumnList.size(); j++) {
+          final RelOptTable table = getTargetTables().get(j);
+          final String columnName = this.updateColumnList.get(j);
+          tmpRowType =
+              typeFactory.createJoinType(tmpRowType,
+                  getCatalogReader().createTypeFromProjection(table.getRowType(), ImmutableList.of(columnName)));
+        }
+
+        inputRowType = tmpRowType;
+      }
       break;
     case MERGE:
       assert updateColumnList != null : "updateColumnList must not be null for " + operation;
@@ -264,4 +324,235 @@ public abstract class TableModify extends SingleRel {
     double rowCount = mq.getRowCount(this);
     return planner.getCostFactory().makeCost(rowCount, 0, 0);
   }
+
+  public List<RelOptTable> getTables() {
+    return tables;
+  }
+
+  public TableInfo getTableInfo() {
+    return tableInfo;
+  }
+
+  public List<RelOptTable> getTargetTables() {
+    return tableInfo.getTargetTables();
+  }
+
+  public List<Integer> getTargetTableIndexes() {
+    return tableInfo.getTargetTableIndexes();
+  }
+
+  public List<Map<String, Integer>> getSourceColumnIndexMap() {
+    return tableInfo.getSourceColumnIndexMap();
+  }
+
+  public List<String> getSourceTableNames() {
+    return sourceTableNames;
+  }
+
+  public List<String> getTargetTableNames() {
+      return targetTableNames;
+  }
+
+  public static class TableInfo {
+    /**
+     * <pre>
+     * For DELETE, srcNode is FROM or USING part of SqlDelete
+     * For UPDATE, srcNode is FROM part of SqlUpdate
+     * </pre>
+     */
+    private final SqlNode srcNode;
+    /**
+     * Source table information, including SqlNode, SqlNode with alias and meta of referenced tables
+     */
+    private final List<TableInfoNode> srcInfos;
+    /**
+     * <pre>
+     * Target table meta
+     *
+     * For DELETE, targetTables represents tables that records will be removed from
+     * For UPDATE, targetTables represents the table meta of each SET item
+     * </pre>
+     */
+    private List<RelOptTable> targetTables;
+    /**
+     * Mapping from {@link #targetTables} to {@link #srcInfos}
+     */
+    private List<Integer> targetTableIndexes;
+    /**
+     * <pre>
+     * Foreach source table, store a map from column name to referenced index of input rowType,
+     * the size of sourceColumnIndexMap equals to the size of {@link #srcInfos}
+     * </pre>
+     */
+    private List<Map<String, Integer>> sourceColumnIndexMap;
+    private final List<TableInfoNode> refTableInfos;
+
+    private TableInfo(SqlNode srcNode, List<TableInfoNode> srcInfos, List<Integer> targetTableIndexes,
+                      List<Map<String, Integer>> sourceColumnIndexMap, List<TableInfoNode> refTableInfos) {
+      this.srcNode = srcNode;
+      this.srcInfos = srcInfos;
+      this.targetTables =
+              targetTableIndexes.stream().map(i -> srcInfos.get(i).getRefTable()).collect(Collectors.toList());
+      this.targetTableIndexes = targetTableIndexes;
+      this.sourceColumnIndexMap = sourceColumnIndexMap;
+      this.refTableInfos = refTableInfos;
+    }
+
+    public SqlNode getSrcNode() {
+      return srcNode;
+    }
+
+    public List<TableInfoNode> getSrcInfos() {
+      return srcInfos;
+    }
+
+    public List<String> getRefTableNames() {
+      return srcInfos.stream()
+              .flatMap(p -> p.getRefTables().stream())
+              .map(t -> Util.last(t.getQualifiedName()))
+              .collect(Collectors.toList());
+    }
+
+    public List<String> getTargetTableNames() {
+      return getTargetTables().stream().map(t -> Util.last(t.getQualifiedName())).collect(Collectors.toList());
+    }
+
+    public List<RelOptTable> getRefTables() {
+      return Streams.concat(srcInfos.stream(), refTableInfos.stream()).flatMap(p -> p.getRefTables().stream())
+              .collect(Collectors.toList());
+    }
+
+    public List<TableInfoNode> getRefTableInfos() {
+      return refTableInfos;
+    }
+
+    public List<RelOptTable> getTargetTables() {
+      return targetTables;
+    }
+
+    public List<Map<String, Integer>> getSourceColumnIndexMap() {
+      return sourceColumnIndexMap;
+    }
+
+    public void setTargetTables(List<RelOptTable> targetTables) {
+      this.targetTables = targetTables;
+    }
+
+    public List<Integer> getTargetTableIndexes() {
+      return targetTableIndexes;
+    }
+
+    public Set<RelOptTable> getTargetTableSet() {
+      return new HashSet<>(getTargetTables());
+    }
+
+    public Set<Integer> getTargetTableIndexSet() {
+      return new HashSet<>(getTargetTableIndexes());
+    }
+
+    public boolean isSingleSource() {
+      return this.srcInfos.size() <= 1;
+    }
+
+    public boolean isSingleTarget() {
+      return getTargetTableIndexSet().size() == 1;
+    }
+
+    public static TableInfo singleSource(RelOptTable table) {
+      final SqlIdentifier tableName = new SqlIdentifier(table.getQualifiedName(), SqlParserPos.ZERO);
+      final Map<String, Integer> sourceColumnIndexMap = buildColumnIndexMapFor(table);
+      return new TableInfo(tableName,
+              ImmutableList.of(new TableInfoNode(tableName, tableName, ImmutableList.of(table))),
+              ImmutableList.of(0), ImmutableList.of(sourceColumnIndexMap), ImmutableList.of());
+    }
+
+    public static TableInfo singleSource(RelOptTable table, RelNode sourceRel) {
+      final SqlIdentifier tableName = new SqlIdentifier(table.getQualifiedName(), SqlParserPos.ZERO);
+      final Map<String, Integer> sourceColumnIndexMap = buildColumnIndexMapFor(sourceRel.getRowType());
+      return new TableInfo(tableName,
+              ImmutableList.of(new TableInfoNode(tableName, tableName, ImmutableList.of(table))),
+              ImmutableList.of(0), ImmutableList.of(sourceColumnIndexMap), ImmutableList.of());
+    }
+
+    public static Map<String, Integer> buildColumnIndexMapFor(RelDataType sourceRowType) {
+      final Map<String, Integer> targetColumnIndexMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+      Ord.zip(sourceRowType.getFieldNames()).forEach(o -> targetColumnIndexMap.put(o.e, o.i));
+      return targetColumnIndexMap;
+    }
+
+    public static Map<String, Integer> buildColumnIndexMapFor(RelOptTable table) {
+      return buildColumnIndexMapFor(table.getRowType());
+    }
+
+    public static TableInfo  create(SqlNode sourceTableNode, List<TableInfoNode> srcTableInfos,
+                                    List<Integer> targetTables, List<Map<String, Integer>> tableColumnIndexMap) {
+      return create(sourceTableNode, srcTableInfos, targetTables, tableColumnIndexMap, ImmutableList.of());
+    }
+
+    public static TableInfo create(SqlNode sourceTableNode, List<TableInfoNode> srcTableInfos,
+                                   List<Integer> targetTables, List<Map<String, Integer>> sourceColumnIndexMap,
+                                   List<TableInfoNode> refTableInfos) {
+      Preconditions.checkNotNull(sourceTableNode);
+      Preconditions.checkNotNull(srcTableInfos);
+      Preconditions.checkNotNull(targetTables);
+      Preconditions.checkArgument(!srcTableInfos.isEmpty());
+
+      return new TableInfo(sourceTableNode, srcTableInfos, targetTables, sourceColumnIndexMap, refTableInfos);
+    }
+  }
+
+  public static class TableInfoNode {
+    private final SqlNode table;
+    private final SqlNode tableWithAlias;
+    private List<RelOptTable> refTables;
+    private final int columnCount;
+
+    public TableInfoNode(SqlNode table, SqlNode tableWithAlias, List<RelOptTable> refTables) {
+      this.table = table;
+      this.tableWithAlias = tableWithAlias;
+      this.refTables = refTables;
+      if (table instanceof SqlIdentifier || table instanceof SqlDynamicParam) {
+        this.columnCount = refTables.get(0).getRowType().getFieldCount();
+      } else if (RelOptUtil.isUnion(table)) {
+        this.columnCount = RelOptUtil.getColumnCount(table);
+      } else {
+        SqlSelect subquery = (SqlSelect) table;
+        this.columnCount = subquery.getSelectList().size();
+      }
+      Preconditions.checkState(this.columnCount > 0);
+    }
+
+    public SqlNode getTable() {
+      return table;
+    }
+
+    public SqlNode getTableWithAlias() {
+      return tableWithAlias;
+    }
+
+    public List<RelOptTable> getRefTables() {
+      return refTables;
+    }
+
+    public void setRefTables(List<RelOptTable> refTables) {
+      this.refTables = refTables;
+    }
+
+    public RelOptTable getRefTable() {
+      return refTables.get(0);
+    }
+
+    public int getColumnCount() {
+      return columnCount;
+    }
+
+    public boolean isTable() {
+      return table instanceof SqlIdentifier;
+    }
+
+    public boolean isSubquery() {
+      return !isTable();
+    }
+  }
+
 }

@@ -76,6 +76,7 @@ import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.SqlTableRef;
 import org.apache.calcite.sql.SqlUpdate;
 import org.apache.calcite.sql.SqlUtil;
+import org.apache.calcite.sql.dialect.CalciteSqlDialect;
 import org.apache.calcite.sql.fun.SqlInternalOperators;
 import org.apache.calcite.sql.fun.SqlSingleValueAggFunction;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
@@ -105,6 +106,7 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
@@ -237,7 +239,7 @@ public class RelToSqlConverter extends SqlImplementor
     } else {
       sqlCondition =
           convertConditionToSqlNode(e.getCondition(), leftContext,
-              rightContext);
+              rightContext, e.getLeft().getRowType().getFieldCount());
       condType = JoinConditionType.ON;
     }
     SqlNode join =
@@ -258,8 +260,8 @@ public class RelToSqlConverter extends SqlImplementor
     final Context rightContext = rightResult.qualifiedContext();
 
     final SqlSelect sqlSelect = leftResult.asSelect();
-    SqlNode sqlCondition =
-        convertConditionToSqlNode(e.getCondition(), leftContext, rightContext);
+    SqlNode sqlCondition = convertConditionToSqlNode(
+            e.getCondition(), leftContext, rightContext, e.getLeft().getRowType().getFieldCount());
     if (leftResult.neededAlias != null) {
       SqlShuttle visitor = new AliasReplacementShuttle(leftResult.neededAlias,
           e.getLeft().getRowType(), sqlSelect.getSelectList());
@@ -989,19 +991,56 @@ public class RelToSqlConverter extends SqlImplementor
       return result(sqlInsert, ImmutableList.of(), modify, null);
     }
     case UPDATE: {
-      final Result input = visitInput(modify, 0);
+      final Result input = visitInput(modify.getInput(), 0);
+      final SqlSelect asSelect = input.asSelect();
+      final SqlNodeList selectList = Optional.ofNullable(asSelect.getSelectList()).orElseGet(() -> new SqlNodeList(
+          input.getAliases().entrySet().stream().flatMap(e -> e.getValue().getFieldNames().stream()
+              .map(fieldName -> new SqlIdentifier(ImmutableList.of(e.getKey(), fieldName), POS)))
+              .collect(Collectors.toList()), POS));
 
-      final SqlUpdate sqlUpdate =
-          new SqlUpdate(POS, sqlTargetTable,
-              identifierList(
-                  requireNonNull(modify.getUpdateColumnList(),
-                      () -> "modify.getUpdateColumnList() is null for " + modify)),
-              exprList(context,
-                  requireNonNull(modify.getSourceExpressionList(),
-                      () -> "modify.getSourceExpressionList() is null for " + modify)),
-              ((SqlSelect) input.node).getWhere(), input.asSelect(),
-              null);
+      final Context updateSourceContext = new Context(CalciteSqlDialect.DEFAULT, selectList.size()) {
+        @Override
+        public SqlNode field(int ordinal) {
+          final SqlNode selectItem = selectList.get(ordinal);
+          switch (selectItem.getKind()) {
+            case AS:
+              return ((SqlCall) selectItem).operand(0);
+          }
+          return selectItem;
+        }
 
+        @Override
+        public SqlImplementor implementor() {
+          throw new UnsupportedOperationException(); // TODO
+        }
+      };
+
+      SqlNodeList targetColumnList = null;
+      if (modify.getTableInfo() == null || modify.getTableInfo().isSingleSource()) {
+        targetColumnList = identifierList(modify.getUpdateColumnList());
+      } else {
+        final List<SqlNode> updateColumnList = new ArrayList<>();
+        final List<Integer> targetTableIndexes = modify.getTableInfo().getTargetTableIndexes();
+        final List<Map<String, Integer>> sourceColumnIndexMap = modify.getSourceColumnIndexMap();
+        final List<String> targetColumnNames = modify.getUpdateColumnList();
+        for (int i = 0; i < targetColumnNames.size(); i++) {
+          final Integer targetTableIndex = targetTableIndexes.get(i);
+          final String targetColumnName = targetColumnNames.get(i);
+          final Integer columnRef = sourceColumnIndexMap.get(targetTableIndex).get(targetColumnName);
+          updateColumnList.add(updateSourceContext.field(columnRef).clone(SqlParserPos.ZERO));
+        }
+        targetColumnList = new SqlNodeList(updateColumnList, SqlParserPos.ZERO);
+      }
+
+      final SqlUpdate sqlUpdate = new SqlUpdate(POS,
+              asSelect.getFrom(),
+              targetColumnList,
+              exprList(updateSourceContext, modify.getSourceExpressionList()),
+              asSelect.getWhere(),
+              input.asSelect(),
+              null).initTableInfo(modify.getTableInfo());
+
+      // multi table update
       return result(sqlUpdate, input.clauses, modify, null);
     }
     case DELETE: {

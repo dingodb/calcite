@@ -471,6 +471,29 @@ public abstract class BuiltInMetadata {
     }
   }
 
+  public interface DmlColumnName extends Metadata {
+    MetadataDef<DmlColumnName> DEF = MetadataDef.of(DmlColumnName.class,
+        DmlColumnName.Handler.class, BuiltInMethod.DML_COLUMN_NAME.method);
+
+    /**
+     * For a given output column of an expression, determines all columns of
+     * underlying tables which contribute to result values. Each output column may
+     * have more than one origin due to expressions such as Union and
+     * LogicalProject. The optimizer may use this information for catalog access
+     * (e.g. index availability).
+     *
+     * @return list of set of origin columns, or null if this information cannot be
+     * determined (whereas empty set indicates definitely no origin columns at
+     * all)
+     */
+    List<Set<RelColumnOrigin>> getDmlColumnNames();
+
+    /** Handler API. */
+    interface Handler extends MetadataHandler<DmlColumnName> {
+      List<Set<RelColumnOrigin>> getDmlColumnNames(RelNode r, RelMetadataQuery mq);
+    }
+  }
+
   /** Metadata about the origins of expressions. */
   public interface ExpressionLineage extends Metadata {
     MetadataDef<ExpressionLineage> DEF = MetadataDef.of(ExpressionLineage.class,
@@ -814,7 +837,7 @@ public abstract class BuiltInMetadata {
 
   /** The built-in forms of metadata. */
   interface All extends Selectivity, UniqueKeys, RowCount, DistinctRowCount,
-      PercentageOriginalRows, ColumnUniqueness, ColumnOrigin, Predicates,
+      PercentageOriginalRows, ColumnUniqueness, ColumnOrigin, DmlColumnName, Predicates,
       Collation, Distribution, Size, Parallelism, Memory, AllPredicates,
       ExpressionLineage, TableReferences, NodeTypes {
   }

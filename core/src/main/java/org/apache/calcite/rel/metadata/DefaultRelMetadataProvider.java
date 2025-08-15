@@ -43,6 +43,7 @@ public class DefaultRelMetadataProvider extends ChainedRelMetadataProvider {
         ImmutableList.of(
             RelMdPercentageOriginalRows.SOURCE,
             RelMdColumnOrigins.SOURCE,
+            RelMdDmlColumnNames.SOURCE,
             RelMdExpressionLineage.SOURCE,
             RelMdTableReferences.SOURCE,
             RelMdNodeTypes.SOURCE,

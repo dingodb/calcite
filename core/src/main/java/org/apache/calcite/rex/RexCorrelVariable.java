@@ -57,6 +57,10 @@ public class RexCorrelVariable extends RexVariable {
     return SqlKind.CORREL_VARIABLE;
   }
 
+  public CorrelationId getId() {
+        return id;
+    }
+
   @Override public boolean equals(@Nullable Object obj) {
     return this == obj
         || obj instanceof RexCorrelVariable

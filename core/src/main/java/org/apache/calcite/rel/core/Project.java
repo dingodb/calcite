@@ -172,6 +172,12 @@ public abstract class Project extends SingleRel implements Hintable {
   public abstract Project copy(RelTraitSet traitSet, RelNode input,
       List<RexNode> projects, RelDataType rowType);
 
+  public Project copy(RelTraitSet traitSet, RelNode input,
+      List<RexNode> projects, RelDataType rowType,
+      RelDataType originalRowType) {
+    return copy(traitSet, input, projects, rowType);
+  }
+
   @Deprecated // to be removed before 2.0
   public Project copy(RelTraitSet traitSet, RelNode input,
       List<RexNode> projects, RelDataType rowType, int flags) {

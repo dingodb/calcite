@@ -16,6 +16,8 @@
  */
 package org.apache.calcite.sql;
 
+import com.google.common.collect.ImmutableList;
+import org.apache.calcite.rel.core.TableModify;
 import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql.validate.SqlValidatorImpl;
@@ -26,7 +28,11 @@ import org.apache.calcite.util.Pair;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.checkerframework.dataflow.qual.Pure;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * A <code>SqlUpdate</code> is a node of a parse tree which represents an UPDATE
@@ -37,11 +43,16 @@ public class SqlUpdate extends SqlCall {
       new SqlSpecialOperator("UPDATE", SqlKind.UPDATE);
 
   SqlNode targetTable;
+  SqlNodeList sourceTables;
+  SqlNodeList aliases;
   SqlNodeList targetColumnList;
   SqlNodeList sourceExpressionList;
   @Nullable SqlNode condition;
   @Nullable SqlSelect sourceSelect;
   @Nullable SqlIdentifier alias;
+  List<Pair<SqlNode, List<SqlNode>>> sourceTableColumns;
+  Map<SqlNode, List<SqlIdentifier>> subQueryTableMap;
+  private boolean targetTablesCollected;
 
   //~ Constructors -----------------------------------------------------------
 
@@ -60,6 +71,37 @@ public class SqlUpdate extends SqlCall {
     this.sourceSelect = sourceSelect;
     assert sourceExpressionList.size() == targetColumnList.size();
     this.alias = alias;
+    this.sourceTables = new SqlNodeList(ImmutableList.of(targetTable), SqlParserPos.ZERO);
+    this.aliases = new SqlNodeList(ImmutableList.of(targetTable), SqlParserPos.ZERO);
+    this.subQueryTableMap = new HashMap<>();
+    this.sourceTableColumns = new ArrayList<>();
+    this.targetTablesCollected = true;
+  }
+
+  public SqlUpdate(SqlParserPos pos,
+      SqlNode targetTable,
+      SqlNodeList sourceTables,
+      SqlNodeList aliases,
+      Map<SqlNode, List<SqlIdentifier>> subQueryTableMap,
+      SqlNodeList targetColumnList,
+      SqlNodeList sourceExpressionList,
+      SqlNode condition,
+      SqlSelect sourceSelect,
+      SqlIdentifier alias,
+      boolean targetTablesCollected) {
+    super(pos);
+    this.targetTable = targetTable;
+    this.sourceTables = sourceTables;
+    this.aliases = aliases;
+    this.subQueryTableMap = subQueryTableMap;
+    this.targetColumnList = targetColumnList;
+    this.sourceExpressionList = sourceExpressionList;
+    this.condition = condition;
+    this.sourceSelect = sourceSelect;
+    assert sourceExpressionList.size() == targetColumnList.size();
+    this.alias = alias;
+    this.sourceTableColumns = new ArrayList<>();
+    this.targetTablesCollected = targetTablesCollected;
   }
 
   //~ Methods ----------------------------------------------------------------
@@ -82,7 +124,7 @@ public class SqlUpdate extends SqlCall {
   @Override public void setOperand(int i, @Nullable SqlNode operand) {
     switch (i) {
     case 0:
-      assert operand instanceof SqlIdentifier;
+      assert (operand instanceof SqlIdentifier || operand instanceof SqlDynamicParam);
       targetTable = operand;
       break;
     case 1:
@@ -130,6 +172,24 @@ public class SqlUpdate extends SqlCall {
     return sourceExpressionList;
   }
 
+  public SqlNodeList getSourceTables() {
+    if (!targetTablesCollected) {
+      throw new RuntimeException("SqlUpdate not initialized");
+    }
+    return sourceTables;
+  }
+
+  public SqlNodeList getAliases() {
+    if (!targetTablesCollected) {
+      throw new RuntimeException("SqlUpdate not initialized");
+    }
+    return aliases;
+  }
+
+  public boolean singleTable() {
+    return getSourceTables().size() <= 1;
+  }
+
   /**
    * Gets the filter condition for rows to be updated.
    *
@@ -138,6 +198,14 @@ public class SqlUpdate extends SqlCall {
    */
   public @Nullable SqlNode getCondition() {
     return condition;
+  }
+
+  public List<Pair<SqlNode, List<SqlNode>>> getSourceTableColumns() {
+    return sourceTableColumns;
+  }
+
+  public void setSourceTableColumns(List<Pair<SqlNode, List<SqlNode>>> sourceTableColumns) {
+    this.sourceTableColumns = sourceTableColumns;
   }
 
   /**
@@ -188,5 +256,43 @@ public class SqlUpdate extends SqlCall {
 
   @Override public void validate(SqlValidator validator, SqlValidatorScope scope) {
     validator.validateUpdate(this);
+  }
+
+  public List<SqlIdentifier> subQueryTables(SqlNode subQuery) {
+    if (!targetTablesCollected) {
+      throw new RuntimeException("SqlUpdate not initialized");
+    }
+    return subQueryTableMap.get(subQuery);
+  }
+
+  public SqlUpdate initTableInfo(TableModify.TableInfo srcInfo) {
+    final List<SqlNode> sourceTables = new ArrayList<>();
+    final List<SqlNode> aliases = new ArrayList<>();
+    final Map<SqlNode, List<SqlIdentifier>> subQueryTableMap = new HashMap<>();
+
+    srcInfo.getSrcInfos().forEach(sti -> {
+      sourceTables.add(sti.getTable());
+      aliases.add(sti.getTableWithAlias());
+      subQueryTableMap.put(sti.getTable(),
+              sti.getRefTables()
+                  .stream()
+                  .map(t -> new SqlIdentifier(t.getQualifiedName(), SqlParserPos.ZERO))
+                  .collect(Collectors.toList()));
+    });
+
+    this.sourceTables = new SqlNodeList(sourceTables, SqlParserPos.ZERO);
+    this.aliases = new SqlNodeList(aliases, SqlParserPos.ZERO);
+    this.subQueryTableMap = subQueryTableMap;
+
+    this.targetTablesCollected = true;
+
+    return this;
+  }
+
+  @Override
+  public SqlNode clone(SqlParserPos pos) {
+    return new SqlUpdate(pos, getTargetTable(), getSourceTables(), getAliases(), this.subQueryTableMap,
+        getTargetColumnList(), getSourceExpressionList(), getCondition(), getSourceSelect(), getAlias(),
+        this.targetTablesCollected);
   }
 }
