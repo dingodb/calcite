@@ -312,16 +312,87 @@ public abstract class SqlImplementor {
    */
   public static SqlNode convertConditionToSqlNode(RexNode node,
       Context leftContext,
-      Context rightContext) {
+      Context rightContext, int leftFieldCount) {
     if (node.isAlwaysTrue()) {
       return SqlLiteral.createBoolean(true, POS);
     }
     if (node.isAlwaysFalse()) {
       return SqlLiteral.createBoolean(false, POS);
     }
-    final Context joinContext =
-        leftContext.implementor().joinContext(leftContext, rightContext);
-    return joinContext.toSql(null, node);
+
+    final List<RexNode> operands;
+    final SqlOperator op;
+    final Context joinContext;
+    switch (node.getKind()) {
+      case AND:
+      case OR:
+        operands = ((RexCall) node).getOperands();
+        op = ((RexCall) node).getOperator();
+        SqlNode sqlCondition = null;
+        for (RexNode operand : operands) {
+          SqlNode x = convertConditionToSqlNode(operand, leftContext,
+              rightContext, leftFieldCount);
+          if (sqlCondition == null) {
+            sqlCondition = x;
+          } else {
+            sqlCondition = op.createCall(POS, sqlCondition, x);
+          }
+        }
+        return sqlCondition;
+      case EQUALS:
+      case IS_NOT_DISTINCT_FROM:
+      case NOT_EQUALS:
+      case GREATER_THAN:
+      case GREATER_THAN_OR_EQUAL:
+      case LESS_THAN:
+      case LESS_THAN_OR_EQUAL:
+      case LIKE:
+        node = stripCastFromString(node);
+        operands = ((RexCall) node).getOperands();
+        op = ((RexCall) node).getOperator();
+        if (operands.size() == 2
+            && operands.get(0) instanceof RexInputRef
+            && operands.get(1) instanceof RexInputRef
+            && !SqlKind.LIKE.equals(node.getKind())) {
+          final RexInputRef op0 = (RexInputRef) operands.get(0);
+          final RexInputRef op1 = (RexInputRef) operands.get(1);
+
+          if (op0.getIndex() < leftFieldCount
+              && op1.getIndex() >= leftFieldCount) {
+            return op.createCall(POS,
+                leftContext.field(op0.getIndex()),
+                rightContext.field(op1.getIndex() - leftFieldCount));
+          }
+          if (op1.getIndex() < leftFieldCount
+              && op0.getIndex() >= leftFieldCount) {
+            return reverseOperatorDirection(op).createCall(POS,
+                leftContext.field(op1.getIndex()),
+                rightContext.field(op0.getIndex() - leftFieldCount));
+          }
+        }
+        joinContext = leftContext.implementor().joinContext(leftContext, rightContext);
+        return joinContext.toSql(null, node);
+      case IS_NULL:
+      case IS_NOT_NULL:
+        operands = ((RexCall) node).getOperands();
+        if (operands.size() == 1
+            && operands.get(0) instanceof RexInputRef) {
+          op = ((RexCall) node).getOperator();
+          final RexInputRef op0 = (RexInputRef) operands.get(0);
+          if (op0.getIndex() < leftFieldCount) {
+            return op.createCall(POS, leftContext.field(op0.getIndex()));
+          } else {
+            return op.createCall(POS,
+                    rightContext.field(op0.getIndex() - leftFieldCount));
+          }
+        }
+        joinContext = leftContext.implementor().joinContext(leftContext, rightContext);
+        return joinContext.toSql(null, node);
+      default:
+        node = stripCastFromString(node);
+        joinContext = leftContext.implementor().joinContext(leftContext, rightContext);
+        return joinContext.toSql(null, node);
+    }
   }
 
   /** Removes cast from string.
@@ -329,7 +400,7 @@ public abstract class SqlImplementor {
    * <p>For example, {@code x > CAST('2015-01-07' AS DATE)}
    * becomes {@code x > '2015-01-07'}.
    */
-  private static RexNode stripCastFromString(RexNode node, SqlDialect dialect) {
+  private static RexNode stripCastFromString(RexNode node) {
     switch (node.getKind()) {
     case EQUALS:
     case IS_NOT_DISTINCT_FROM:
@@ -343,27 +414,43 @@ public abstract class SqlImplementor {
       final RexNode o1 = call.operands.get(1);
       if (o0.getKind() == SqlKind.CAST
           && o1.getKind() != SqlKind.CAST) {
-        if (!dialect.supportsImplicitTypeCoercion((RexCall) o0)) {
-          // If the dialect does not support implicit type coercion,
-          // we definitely can not strip the cast.
-          return node;
-        }
         final RexNode o0b = ((RexCall) o0).getOperands().get(0);
-        return call.clone(call.getType(), ImmutableList.of(o0b, o1));
+        switch (o0b.getType().getSqlTypeName()) {
+          case CHAR:
+          case VARCHAR:
+            return call.clone(call.getType(), ImmutableList.of(o0b, o1));
+        }
       }
       if (o1.getKind() == SqlKind.CAST
           && o0.getKind() != SqlKind.CAST) {
-        if (!dialect.supportsImplicitTypeCoercion((RexCall) o1)) {
-          return node;
-        }
         final RexNode o1b = ((RexCall) o1).getOperands().get(0);
-        return call.clone(call.getType(), ImmutableList.of(o0, o1b));
+        switch (o1b.getType().getSqlTypeName()) {
+          case CHAR:
+          case VARCHAR:
+            return call.clone(call.getType(), ImmutableList.of(o0, o1b));
+        }
       }
-      break;
-    default:
-      break;
     }
     return node;
+  }
+
+  private static SqlOperator reverseOperatorDirection(SqlOperator op) {
+    switch (op.kind) {
+      case GREATER_THAN:
+        return SqlStdOperatorTable.LESS_THAN;
+      case GREATER_THAN_OR_EQUAL:
+        return SqlStdOperatorTable.LESS_THAN_OR_EQUAL;
+      case LESS_THAN:
+        return SqlStdOperatorTable.GREATER_THAN;
+      case LESS_THAN_OR_EQUAL:
+        return SqlStdOperatorTable.GREATER_THAN_OR_EQUAL;
+      case EQUALS:
+      case IS_NOT_DISTINCT_FROM:
+      case NOT_EQUALS:
+        return op;
+      default:
+        throw new AssertionError(op);
+    }
   }
 
   public static JoinType joinType(JoinRelType joinType) {
@@ -776,7 +863,7 @@ public abstract class SqlImplementor {
     private SqlNode callToSql(@Nullable RexProgram program, RexCall call0,
         boolean not) {
       final RexCall call1 = reverseCall(call0);
-      final RexCall call = (RexCall) stripCastFromString(call1, dialect);
+      final RexCall call = (RexCall) stripCastFromString(call1);
       SqlOperator op = call.getOperator();
       switch (op.getKind()) {
       case SUM0:
@@ -2034,6 +2121,10 @@ public abstract class SqlImplementor {
           ? this
           : new Result(node, clauses, neededAlias, neededType, aliases, anon,
               ignoreClauses, ImmutableSet.copyOf(expectedClauses), expectedRel);
+    }
+
+    public Map<String, RelDataType> getAliases() {
+      return aliases;
     }
   }
 

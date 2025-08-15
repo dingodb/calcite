@@ -634,7 +634,7 @@ public class SqlValidatorUtil {
     final Table t = table == null ? null : table.unwrap(Table.class);
     if (!(t instanceof CustomColumnResolvingTable)) {
       final SqlNameMatcher nameMatcher = catalogReader.nameMatcher();
-      return nameMatcher.field(rowType, id.getSimple());
+      return nameMatcher.field(rowType, id.getLastName());
     }
 
     final List<Pair<RelDataTypeField, List<String>>> entries =

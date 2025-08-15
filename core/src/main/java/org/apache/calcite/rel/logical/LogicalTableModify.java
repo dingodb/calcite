@@ -29,6 +29,7 @@ import org.apache.calcite.rex.RexNode;
 
 import org.checkerframework.checker.nullness.qual.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -36,6 +37,10 @@ import java.util.List;
  * not targeted at any particular engine or calling convention.
  */
 public final class LogicalTableModify extends TableModify {
+
+  private final List<RelOptTable> extraTargetTables;
+  private final List<String> extraTargetColumns;
+
   //~ Constructors -----------------------------------------------------------
 
   /**
@@ -49,6 +54,8 @@ public final class LogicalTableModify extends TableModify {
       @Nullable List<RexNode> sourceExpressionList, boolean flattened) {
     super(cluster, traitSet, table, schema, input, operation, updateColumnList,
         sourceExpressionList, flattened);
+    this.extraTargetTables = new ArrayList<>();
+    this.extraTargetColumns = new ArrayList<>();
   }
 
   /**
@@ -56,6 +63,8 @@ public final class LogicalTableModify extends TableModify {
    */
   public LogicalTableModify(RelInput input) {
     super(input);
+    this.extraTargetTables = new ArrayList<>();
+    this.extraTargetColumns = new ArrayList<>();
   }
 
   @Deprecated // to be removed before 2.0
@@ -73,6 +82,17 @@ public final class LogicalTableModify extends TableModify {
         flattened);
   }
 
+  public LogicalTableModify(RelOptCluster cluster, RelTraitSet traitSet,
+      RelOptTable table, Prepare.CatalogReader schema, RelNode input,
+      Operation operation, List<String> updateColumnList,
+      List<RexNode> sourceExpressionList, boolean flattened,
+      TableInfo tableInfo, List<RelOptTable> extraTargetTables, List<String> extraTargetColumns) {
+    super(cluster, traitSet, table, schema, input, operation, updateColumnList,
+            sourceExpressionList, flattened, tableInfo);
+    this.extraTargetTables = extraTargetTables;
+    this.extraTargetColumns = extraTargetColumns;
+  }
+
   /** Creates a LogicalTableModify. */
   public static LogicalTableModify create(RelOptTable table,
       Prepare.CatalogReader schema, RelNode input,
@@ -84,6 +104,17 @@ public final class LogicalTableModify extends TableModify {
         operation, updateColumnList, sourceExpressionList, flattened);
   }
 
+  public static LogicalTableModify create(RelOptTable table,
+      Prepare.CatalogReader schema, RelNode input,
+      Operation operation, List<String> updateColumnList,
+      List<RexNode> sourceExpressionList, boolean flattened,
+      TableInfo tableInfo, List<RelOptTable> extraTargetTables, List<String> extraTargetColumns) {
+    final RelOptCluster cluster = input.getCluster();
+    final RelTraitSet traitSet = cluster.traitSetOf(Convention.NONE);
+    return new LogicalTableModify(cluster, traitSet, table, schema, input, operation, updateColumnList,
+            sourceExpressionList, flattened, tableInfo, extraTargetTables, extraTargetColumns);
+  }
+
   //~ Methods ----------------------------------------------------------------
 
   @Override public LogicalTableModify copy(RelTraitSet traitSet,
@@ -91,10 +122,18 @@ public final class LogicalTableModify extends TableModify {
     assert traitSet.containsIfApplicable(Convention.NONE);
     return new LogicalTableModify(getCluster(), traitSet, table, catalogReader,
         sole(inputs), getOperation(), getUpdateColumnList(),
-        getSourceExpressionList(), isFlattened());
+        getSourceExpressionList(), isFlattened(), getTableInfo(), getExtraTargetTables(), getExtraTargetColumns());
   }
 
   @Override public RelNode accept(RelShuttle shuttle) {
     return shuttle.visit(this);
+  }
+
+  public List<RelOptTable> getExtraTargetTables() {
+    return extraTargetTables;
+  }
+
+  public List<String> getExtraTargetColumns() {
+    return extraTargetColumns;
   }
 }

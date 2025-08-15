@@ -1177,6 +1177,22 @@ public class RexUtil {
     return createStructType(typeFactory, exprs, names, null);
   }
 
+  public static RelDataType createOriginalStructType(
+          RelDataTypeFactory typeFactory,
+          final List<? extends RexNode> exprs,
+          List<String> names) {
+    // assert names.size() == exprs.size();
+    final RelDataTypeFactory.FieldInfoBuilder builder = typeFactory.builder();
+    for (int i = 0; i < exprs.size(); i++) {
+      String name;
+      if (names == null || (name = names.get(i)) == null) {
+        name = "$f" + i;
+      }
+      builder.add(name, exprs.get(i).getType());
+    }
+    return builder.build();
+  }
+
   /**
    * Returns whether the type of an array of expressions is compatible with a
    * struct type.

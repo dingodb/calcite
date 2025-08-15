@@ -34,18 +34,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.RelShuttleImpl;
 import org.apache.calcite.rel.SingleRel;
-import org.apache.calcite.rel.core.Aggregate;
-import org.apache.calcite.rel.core.AggregateCall;
-import org.apache.calcite.rel.core.Collect;
-import org.apache.calcite.rel.core.CorrelationId;
-import org.apache.calcite.rel.core.Filter;
-import org.apache.calcite.rel.core.Join;
-import org.apache.calcite.rel.core.JoinInfo;
-import org.apache.calcite.rel.core.JoinRelType;
-import org.apache.calcite.rel.core.Project;
-import org.apache.calcite.rel.core.RelFactories;
-import org.apache.calcite.rel.core.Sample;
-import org.apache.calcite.rel.core.Sort;
+import org.apache.calcite.rel.core.*;
 import org.apache.calcite.rel.hint.HintStrategyTable;
 import org.apache.calcite.rel.hint.Hintable;
 import org.apache.calcite.rel.hint.RelHint;
@@ -64,6 +53,7 @@ import org.apache.calcite.rel.logical.LogicalTableScan;
 import org.apache.calcite.rel.logical.LogicalUnion;
 import org.apache.calcite.rel.logical.LogicalValues;
 import org.apache.calcite.rel.metadata.RelColumnMapping;
+import org.apache.calcite.rel.metadata.RelColumnOrigin;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.rel2sql.SqlImplementor;
 import org.apache.calcite.rel.stream.Delta;
@@ -71,22 +61,7 @@ import org.apache.calcite.rel.stream.LogicalDelta;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
-import org.apache.calcite.rex.RexBuilder;
-import org.apache.calcite.rex.RexCall;
-import org.apache.calcite.rex.RexCorrelVariable;
-import org.apache.calcite.rex.RexDynamicParam;
-import org.apache.calcite.rex.RexFieldAccess;
-import org.apache.calcite.rex.RexFieldCollation;
-import org.apache.calcite.rex.RexInputRef;
-import org.apache.calcite.rex.RexLiteral;
-import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.rex.RexPatternFieldRef;
-import org.apache.calcite.rex.RexRangeRef;
-import org.apache.calcite.rex.RexShuttle;
-import org.apache.calcite.rex.RexSubQuery;
-import org.apache.calcite.rex.RexUtil;
-import org.apache.calcite.rex.RexWindowBound;
-import org.apache.calcite.rex.RexWindowBounds;
+import org.apache.calcite.rex.*;
 import org.apache.calcite.schema.ColumnStrategy;
 import org.apache.calcite.schema.ModifiableTable;
 import org.apache.calcite.schema.ModifiableView;
@@ -110,13 +85,8 @@ import org.apache.calcite.sql.util.SqlVisitor;
 import org.apache.calcite.sql.validate.*;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
-import org.apache.calcite.util.ImmutableBitSet;
-import org.apache.calcite.util.ImmutableIntList;
-import org.apache.calcite.util.Litmus;
-import org.apache.calcite.util.NlsString;
-import org.apache.calcite.util.NumberUtil;
-import org.apache.calcite.util.Pair;
-import org.apache.calcite.util.Util;
+import org.apache.calcite.util.*;
+import org.apache.calcite.util.mapping.Mappings;
 import org.apache.calcite.util.trace.CalciteTrace;
 
 import com.google.common.collect.ImmutableList;
@@ -128,27 +98,15 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 import org.immutables.value.Value;
 import org.slf4j.Logger;
 
+import javax.transaction.NotSupportedException;
 import java.lang.reflect.Type;
 import java.math.BigDecimal;
-import java.util.AbstractList;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.BitSet;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Deque;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -189,6 +147,8 @@ public class SqlToRelConverter {
   public static final int DEFAULT_IN_SUBQUERY_THRESHOLD =
       DEFAULT_IN_SUB_QUERY_THRESHOLD;
 
+  public static final String DEFAULT_HINT_GROUP = "_____default____hint__group_";
+
   //~ Instance fields --------------------------------------------------------
 
   public final @Nullable SqlValidator validator;
@@ -227,6 +187,8 @@ public class SqlToRelConverter {
       new HashMap<>();
 
   public final RelOptTable.ViewExpander viewExpander;
+
+  protected final HintBlackboard hintBlackboard = new HintBlackboard();
 
   //~ Constructors -----------------------------------------------------------
   /**
@@ -632,9 +594,15 @@ public class SqlToRelConverter {
   protected void convertSelectImpl(
       final Blackboard bb,
       SqlSelect select) {
-    convertFrom(
-        bb,
-        select.getFrom());
+    this.hintBlackboard.beginSelect(select);
+
+    try {
+      convertFrom(
+          bb,
+          select.getFrom());
+    } finally {
+      this.hintBlackboard.endFrom();
+    }
 
     // We would like to remove ORDER BY clause from an expanded view, except if
     // it is top-level or affects semantics.
@@ -1996,8 +1964,6 @@ public class SqlToRelConverter {
     case NOT:
       logic = logic.negate();
       break;
-    default:
-      break;
     }
     if (node instanceof SqlCall) {
       switch (kind) {
@@ -2009,7 +1975,7 @@ public class SqlToRelConverter {
       case NOT_IN:
         break;
       default:
-        logic = RelOptUtil.Logic.TRUE_FALSE_UNKNOWN;
+        // logic = RelOptUtil.Logic.TRUE_FALSE_UNKNOWN;
         break;
       }
       for (SqlNode operand : ((SqlCall) node).getOperandList()) {
@@ -2264,10 +2230,20 @@ public class SqlToRelConverter {
     case AS:
       call = (SqlCall) from;
       SqlNode firstOperand = call.operand(0);
-      final List<String> fieldNameList = call.operandCount() > 2
-          ? SqlIdentifier.simpleNames(Util.skip(call.getOperandList(), 2))
-          : null;
-      convertFrom(bb, firstOperand, fieldNameList);
+      SqlNode operand1 = call.operand(1);
+      this.hintBlackboard.beginAlias(firstOperand, operand1);
+      try {
+        convertFrom(bb, call.operand(0));
+      } finally {
+        this.hintBlackboard.endAlias();
+      }
+      if (call.operandCount() > 2 && bb.root instanceof Values) {
+        final List<String> fieldNameList = new ArrayList<>();
+        for (SqlNode node : Util.skip(call.getOperandList(), 2)) {
+          fieldNameList.add(((SqlIdentifier) node).getSimple());
+        }
+        bb.setRoot(relBuilder.push(bb.root).rename(fieldNameList).build(), true);
+      }
       return;
 
     case MATCH_RECOGNIZE:
@@ -2346,7 +2322,40 @@ public class SqlToRelConverter {
       return;
 
     case JOIN:
-      convertJoin(bb, (SqlJoin) from);
+      final SqlJoin join = (SqlJoin) from;
+      final SqlValidatorScope scope = validator().getJoinScope(from);
+      final Blackboard fromBlackboard = createBlackboard(scope, null, false);
+      SqlNode left = join.getLeft();
+      SqlNode right = join.getRight();
+      final boolean isNatural = join.isNatural();
+      final JoinType joinType = join.getJoinType();
+      final SqlValidatorScope leftScope = validator().getJoinScope(left);
+      final Blackboard leftBlackboard = createBlackboard(leftScope, null, false);
+      final SqlValidatorScope rightScope = validator().getJoinScope(right);
+      final Blackboard rightBlackboard = createBlackboard(rightScope, null, false);
+      final SqlNodeList hints = this.hintBlackboard.joinHints(left, bb);
+      convertFrom(leftBlackboard, left);
+      RelNode leftRel = leftBlackboard.root;
+      convertFrom(rightBlackboard, right);
+      RelNode rightRel = rightBlackboard.root;
+      JoinRelType convertedJoinType = convertJoinType(joinType);
+      RexNode conditionExp;
+      final SqlValidatorNamespace leftNamespace = validator().getNamespace(left);
+      final SqlValidatorNamespace rightNamespace = validator().getNamespace(right);
+      if (isNatural) {
+        final RelDataType leftRowType = leftNamespace.getRowType();
+        final RelDataType rightRowType = rightNamespace.getRowType();
+        final List<String> columnList =
+            SqlValidatorUtil.deriveNaturalJoinColumnList(catalogReader.nameMatcher(), leftRowType, rightRowType);
+        conditionExp = convertUsing(leftNamespace, rightNamespace, columnList);
+      } else {
+        conditionExp = convertJoinCondition(fromBlackboard, leftNamespace, rightNamespace, join.getCondition(),
+            join.getConditionType(), leftRel, rightRel);
+      }
+
+      final RelNode joinRel =
+              createJoin(fromBlackboard, leftRel, rightRel, conditionExp, convertedJoinType);
+      bb.setRoot(joinRel, false);
       return;
 
     case SELECT:
@@ -2903,7 +2912,7 @@ public class SqlToRelConverter {
       }
 
       return LogicalCorrelate.create(leftRel, innerRel, ImmutableList.of(),
-          p.id, requiredCols, joinType);
+            p.id, requiredCols, joinType);
     }
 
     final RelNode node =
@@ -2912,7 +2921,6 @@ public class SqlToRelConverter {
             .join(joinType, joinCond)
             .build();
 
-    // If join conditions are pushed down, update the leaves.
     if (node instanceof Project) {
       final Join newJoin = (Join) node.getInputs().get(0);
       if (leaves.containsKey(leftRel)) {
@@ -3219,6 +3227,32 @@ public class SqlToRelConverter {
           leftFieldCount + rightFieldCount - 1);
     }
     return Pair.of(conditionExp, newRightRel);
+  }
+
+  private RexNode convertJoinCondition(Blackboard bb, SqlValidatorNamespace leftNamespace,
+                                       SqlValidatorNamespace rightNamespace, SqlNode condition,
+                                       JoinConditionType conditionType, RelNode leftRel, RelNode rightRel) {
+    if (condition == null) {
+      return rexBuilder.makeLiteral(true);
+    }
+    bb.setRoot(ImmutableList.of(leftRel, rightRel));
+    replaceSubQueries(bb, condition, RelOptUtil.Logic.UNKNOWN_AS_FALSE);
+    switch (conditionType) {
+      case ON:
+        bb.setRoot(ImmutableList.of(leftRel, rightRel));
+        return bb.convertExpression(condition);
+      case USING:
+        final SqlNodeList list = (SqlNodeList) condition;
+        final List<String> nameList = new ArrayList<>();
+        for (SqlNode columnName : list) {
+          final SqlIdentifier id = (SqlIdentifier) columnName;
+          String name = id.getSimple();
+          nameList.add(name);
+        }
+        return convertUsing(leftNamespace, rightNamespace, nameList);
+      default:
+        throw Util.unexpected(conditionType);
+    }
   }
 
   /**
@@ -3927,6 +3961,30 @@ public class SqlToRelConverter {
     return requireNonNull(table, "no table found for " + call);
   }
 
+  protected List<TableModify.TableInfoNode> getUpdateSrcTables(SqlUpdate sqlUpdate) {
+    List<TableModify.TableInfoNode> result = new ArrayList<>();
+
+    for (SqlNode srcWithAlias : sqlUpdate.getAliases()) {
+      SqlNode srcNode = srcWithAlias;
+
+      if (srcWithAlias instanceof SqlBasicCall && srcWithAlias.getKind() == SqlKind.AS) {
+        srcNode = ((SqlBasicCall) srcWithAlias).getOperandList().get(0);
+      }
+
+      if (srcNode instanceof SqlIdentifier) {
+        result.add(new TableModify.TableInfoNode(srcNode, srcWithAlias, ImmutableList.of(getTargetTable(srcNode))));
+      } else if (srcNode instanceof SqlSelect || RelOptUtil.isUnion(srcNode)) {
+        final List<SqlIdentifier> tableNames = sqlUpdate.subQueryTables(srcNode);
+        result.add(new TableModify.TableInfoNode(srcNode, srcWithAlias,
+                tableNames.stream().map(this::getTargetTable).collect(Collectors.toList())));
+      } else {
+        throw new AssertionError("Should not be here");
+      }
+    }
+
+    return result;
+  }
+
   /**
    * Creates a source for an INSERT statement.
    *
@@ -4143,39 +4201,69 @@ public class SqlToRelConverter {
   }
 
   private RelNode convertUpdate(SqlUpdate call) {
+    // Source table info
+    // Map column to table it belongs to
+    final Map<String, Integer> aliasTableMap = new HashMap<>();
+    final Map<String, List<Integer>> columnTableMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+    final List<TableModify.TableInfoNode> srcTableInfoNodes = buildUpdateSourceInfo(call, aliasTableMap, columnTableMap);
+
+    // Target table info
+    final List<String> targetColumns = new ArrayList<>();
+    final List<Integer> targetTableIndexes = new ArrayList<>();
+    buildUpdateTargetColumnInfo(call.getTargetColumnList().getList(), srcTableInfoNodes, aliasTableMap,
+            columnTableMap, targetColumns, targetTableIndexes);
+
     final SqlValidatorScope scope = validator().getWhereScope(
         requireNonNull(call.getSourceSelect(), () -> "sourceSelect for " + call));
     Blackboard bb = createBlackboard(scope, null, false);
 
-    replaceSubQueries(bb, call, RelOptUtil.Logic.TRUE_FALSE_UNKNOWN);
+    final List<Integer> extraTargetTables = new ArrayList<>();
+    final List<String> extraTargetColumns = new ArrayList<>();
 
-    RelOptTable targetTable = getTargetTable(call);
+    SqlSelect sourceSelect =
+        rewriteUpdateSourceSelect(call, targetTableIndexes, targetColumns, srcTableInfoNodes, extraTargetTables,
+            extraTargetColumns);
+    targetTableIndexes.addAll(extraTargetTables);
+    targetColumns.addAll(extraTargetColumns);
 
-    // convert update column list from SqlIdentifier to String
-    final List<String> targetColumnNameList = new ArrayList<>();
-    final RelDataType targetRowType = targetTable.getRowType();
-    for (SqlNode node : call.getTargetColumnList()) {
-      SqlIdentifier id = (SqlIdentifier) node;
-      RelDataTypeField field =
-          SqlValidatorUtil.getTargetField(
-              targetRowType, typeFactory, id, catalogReader, targetTable);
-      assert field != null : "column " + id.toString() + " not found";
-      targetColumnNameList.add(field.getName());
-    }
+    convertSelectImpl(bb, sourceSelect);
+    RelNode sourceRel = bb.root;
 
-    RelNode sourceRel = convertSelect(
-        requireNonNull(call.getSourceSelect(), () -> "sourceSelect for " + call), false);
+    this.leaves.remove(sourceRel);
 
-    bb.setRoot(sourceRel, false);
+    final List<Map<String, Integer>> sourceColumnIndexMap =
+        getColumnIndexMap(bb, sourceRel, call.getSourceTableColumns());
+    final TableModify.TableInfo tableInfo =
+        TableModify.TableInfo.create(call.getSourceSelect().getFrom(), srcTableInfoNodes, targetTableIndexes,
+              sourceColumnIndexMap);
+
+    final List<String> newTargetColumns = new ArrayList<>();
+    final List<Integer> newTargetTables = new ArrayList<>();
+    sourceRel =
+        transformUpdateSourceRel(sourceRel, tableInfo, targetColumns, sourceColumnIndexMap, newTargetColumns,
+            newTargetTables);
+
     ImmutableList.Builder<RexNode> rexNodeSourceExpressionListBuilder = ImmutableList.builder();
     for (SqlNode n : call.getSourceExpressionList()) {
       RexNode rn = bb.convertExpression(n);
       rexNodeSourceExpressionListBuilder.add(rn);
     }
+    return LogicalTableModify.create(tableInfo.getTargetTables().get(0), catalogReader, sourceRel,
+        LogicalTableModify.Operation.UPDATE, newTargetColumns, rexNodeSourceExpressionListBuilder.build(), false,
+        TableModify.TableInfo.create(tableInfo.getSrcNode(), tableInfo.getSrcInfos(), newTargetTables,
+                tableInfo.getSourceColumnIndexMap(), tableInfo.getRefTableInfos()),
+        extraTargetTables.stream().map(i -> srcTableInfoNodes.get(i).getRefTable()).collect(Collectors.toList()),
+        extraTargetColumns);
+  }
 
-    return LogicalTableModify.create(targetTable, catalogReader, sourceRel,
-        LogicalTableModify.Operation.UPDATE, targetColumnNameList,
-        rexNodeSourceExpressionListBuilder.build(), false);
+  private List<RexNode> getProjects(RelNode sourceRel) {
+    if (sourceRel instanceof Project) {
+      return ((Project) sourceRel).getProjects();
+    } else if (sourceRel instanceof Sort) {
+      return getProjects(((Sort) sourceRel).getInput());
+    }
+
+    return ImmutableList.of();
   }
 
   private RelNode convertMerge(SqlMerge call) {
@@ -4280,15 +4368,39 @@ public class SqlToRelConverter {
       pv = identifier.names.get(0);
     }
 
-    final SqlQualified qualified = bb.scope.fullyQualify(identifier);
-    final Pair<RexNode, @Nullable BiFunction<RexNode, String, RexNode>> e0 =
-        bb.lookupExp(qualified);
+    final SqlQualified qualified;
+    if (bb.scope != null) {
+      qualified = bb.scope.fullyQualify(identifier);
+    } else {
+      qualified = SqlQualified.create(null, 1, null, identifier);
+    }
+    Pair<RexNode, Map<String, Integer>> e0 = bb.lookupExp(qualified);
+    if (e0 == null) {
+      throw new RuntimeException("Unresolved identifier " + identifier);
+    }
     RexNode e = e0.left;
-    for (String name : qualified.suffix()) {
+
+    final List<String> suffix = qualified.suffix();
+    for (int i = 0; i < suffix.size(); i++) {
+      String name = suffix.get(i);
       if (e == e0.left && e0.right != null) {
-        e = e0.right.apply(e, name);
+        final Integer integer = e0.right.get(name);
+        if (integer == null) {
+          if (bb.scope instanceof ListScope) {
+            final SqlValidatorScope parent = ((ListScope) bb.scope).getParent();
+            e0 = bb.lookupExp(qualified, parent);
+            e = e0.left;
+            --i;
+            continue;
+          } else {
+            throw new RuntimeException("Field not in any table");
+          }
+        } else {
+          i = integer;
+        }
+        e = rexBuilder.makeFieldAccess(e, i);
       } else {
-        final boolean caseSensitive = true; // name already fully-qualified
+        final boolean caseSensitive = true; // name already
         if (identifier.isStar() && bb.scope instanceof MatchRecognizeScope) {
           e = rexBuilder.makeFieldAccess(e, 0);
         } else {
@@ -4306,9 +4418,7 @@ public class SqlToRelConverter {
 
     if (e0.left instanceof RexCorrelVariable) {
       assert e instanceof RexFieldAccess;
-      final RexNode prev =
-          bb.mapCorrelateToRex.put(((RexCorrelVariable) e0.left).id,
-              (RexFieldAccess) e);
+      final RexNode prev = bb.mapCorrelateToRex.put(((RexCorrelVariable) e0.left).getId(), (RexFieldAccess) e);
       assert prev == null;
     }
     return e;
@@ -4485,65 +4595,75 @@ public class SqlToRelConverter {
     replaceSubQueries(bb, selectList, RelOptUtil.Logic.TRUE_FALSE_UNKNOWN);
 
     List<String> fieldNames = new ArrayList<>();
+    List<String> newOrderByNameList = select.isDistinct() ? new ArrayList<>() : null;
+    List<String> originalNames = new ArrayList<>();
     final List<RexNode> exprs = new ArrayList<>();
     final Collection<String> aliases = new TreeSet<>();
 
     // Project any system fields. (Must be done before regular select items,
     // because offsets may be affected.)
     final List<SqlMonotonicity> columnMonotonicityList = new ArrayList<>();
-    extraSelectItems(
-        bb,
-        select,
-        exprs,
-        fieldNames,
-        aliases,
-        columnMonotonicityList);
-
+    extraSelectItems(bb, select, exprs, fieldNames, aliases, columnMonotonicityList);
     // Project select clause.
     int i = -1;
     for (SqlNode expr : selectList) {
       ++i;
       exprs.add(bb.convertExpression(expr));
       fieldNames.add(deriveAlias(expr, aliases, i));
+      originalNames.add(deriveOriginalAlias(expr, i));
+    }
+
+    SqlNodeList newOrderByList = new SqlNodeList(SqlParserPos.ZERO);
+    for (SqlNode order : orderList) {
+      boolean found = false;
+      for (SqlNode g : selectList.getList()) {
+        if (order.toString().equals(g.toString())) {
+          found = true;
+        }
+      }
+
+      if (!found) {
+        newOrderByList.add(order);
+      }
     }
 
     // Project extra fields for sorting.
-    for (SqlNode expr : orderList) {
+    for (SqlNode expr : newOrderByList) {
       ++i;
       SqlNode expr2 = validator().expandOrderExpr(select, expr);
       exprs.add(bb.convertExpression(expr2));
-      fieldNames.add(deriveAlias(expr, aliases, i));
+      String fieldName = deriveAlias(expr, aliases, i);
+      if (newOrderByNameList != null) {
+        newOrderByNameList.add(fieldName);
+      }
+      fieldNames.add(fieldName);
+      originalNames.add(deriveOriginalAlias(expr, i));
     }
 
-    fieldNames = SqlValidatorUtil.uniquify(fieldNames,
-        catalogReader.nameMatcher().isCaseSensitive());
+    fieldNames = SqlValidatorUtil.uniquify(fieldNames, catalogReader.nameMatcher().isCaseSensitive());
 
-    relBuilder.push(bb.root())
-        .projectNamed(exprs, fieldNames, true);
+    RelNode project = RelOptUtil.createProject(bb.root, exprs, fieldNames, originalNames);
+    CorrelationUse correlationUse = null;
+    try {
+      correlationUse = getCorrelationUse(bb, project);
+    } catch (AssertionError e) {
+      throw e;
+    }
 
-    RelNode project = relBuilder.build();
-
-    final RelNode r;
-    final CorrelationUse p = getCorrelationUse(bb, project);
-    if (p != null) {
-      assert p.r instanceof Project;
-      // correlation variables have been normalized in p.r, we should use expressions
-      // in p.r instead of the original exprs
-      Project project1 = (Project) p.r;
-      r = relBuilder.push(bb.root())
-          .projectNamed(project1.getProjects(), fieldNames, true, ImmutableSet.of(p.id))
-          .build();
+    if (correlationUse == null) {
+      bb.setRoot(LogicalProject.create(bb.root, exprs, fieldNames), false);
     } else {
-      r = project;
+      LogicalProject logicalProject = (LogicalProject) correlationUse.r;
+      bb.setRoot(LogicalProject.create(logicalProject.getInput(), logicalProject.getProjects(), fieldNames), false);
     }
-
-    bb.setRoot(r, false);
 
     assert bb.columnMonotonicities.isEmpty();
     bb.columnMonotonicities.addAll(columnMonotonicityList);
     for (SqlNode selectItem : selectList) {
-      bb.columnMonotonicities.add(
-          selectItem.getMonotonicity(bb.scope));
+      bb.columnMonotonicities.add(selectItem.getMonotonicity(bb.scope));
+    }
+    if (select.isDistinct()) {
+      distinctify(bb, true);
     }
   }
 
@@ -4585,6 +4705,15 @@ public class SqlToRelConverter {
       }
     }
     aliases.add(alias);
+    return alias;
+  }
+
+  protected String deriveOriginalAlias(final SqlNode node, final int ordinal) {
+    String alias = validator().deriveAlias(node, ordinal);
+    if (alias == null) {
+      String aliasBase = (alias == null) ? "EXPR$" : alias;
+      alias = aliasBase + ordinal;
+    }
     return alias;
   }
 
@@ -4662,6 +4791,275 @@ public class SqlToRelConverter {
       bb.setRoot(
               relNodeTmp,
               true);
+    }
+  }
+
+  private Project buildProject(List<RexNode> currentProjectItems, List<String> currentFieldNames, RelNode bottom) {
+    Project topProject;
+    if (bottom instanceof Project) {
+      topProject = mergeProject(currentProjectItems, currentFieldNames, (Project) bottom);
+    } else {
+      assert bottom != null;
+      topProject = LogicalProject.create(bottom, currentProjectItems, currentFieldNames);
+    }
+    return topProject;
+  }
+
+  private Project mergeProject(List<RexNode> currentProjectItems, List<String> currentFieldNames, Project bottom) {
+    Project topProject = LogicalProject.create(bottom, currentProjectItems, currentFieldNames);
+
+    final List<RexNode> topProjects = mergeProject(topProject, bottom, relBuilder);
+    topProject = LogicalProject.create(bottom, topProjects, currentFieldNames);
+    return topProject;
+  }
+
+  private static List<RexNode> mergeProject(Project topProject, Project bottomProject, RelBuilder relBuilder) {
+
+    final Permutation topPermutation = topProject.getPermutation();
+    if (topPermutation != null) {
+      if (topPermutation.isIdentity()) {
+        return null;
+      }
+      final Permutation bottomPermutation = bottomProject.getPermutation();
+      if (bottomPermutation != null) {
+        if (bottomPermutation.isIdentity()) {
+          return null;
+        }
+        final Permutation product = topPermutation.product(bottomPermutation);
+
+        // replace the two projects with a combined projection
+        return relBuilder.fields(product);
+      }
+    }
+
+    return RelOptUtil.pushPastProject(topProject.getProjects(), bottomProject);
+  }
+
+  private static Project getProject(RelNode rel) {
+    Project oldProject = null;
+    if (rel instanceof Project) {
+      oldProject = (Project) rel;
+    } else if (rel instanceof Sort) {
+      oldProject = (Project) ((Sort) rel).getInput();
+    }
+    return oldProject;
+  }
+
+  protected List<Map<String, Integer>> getColumnIndexMap(Blackboard bb, RelNode sourceRel,
+                                                         List<Pair<SqlNode, List<SqlNode>>> tableColumns) {
+    final SqlNameMatcher sqlNameMatcher = this.catalogReader.nameMatcher();
+
+    final List<Set<RelColumnOrigin>> columnOriginNames =
+        sourceRel.getCluster().getMetadataQuery().getDmlColumnNames(sourceRel);
+
+    final List<Map<String, Integer>> targetColumnIndexMap = new ArrayList<>();
+    for (Pair<SqlNode, List<SqlNode>> pair : tableColumns) {
+      final List<SqlNode> targetColumns = pair.getValue();
+
+      final Map<String, Integer> columnIndexMap =
+          sqlNameMatcher.isCaseSensitive() ? new HashMap<>() : new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+      for (SqlNode targetColumn : targetColumns) {
+        final RexInputRef ref = (RexInputRef) bb.convertExpression(targetColumn);
+        final String columnName = columnOriginNames.get(ref.getIndex()).iterator().next().getColumnName();
+        columnIndexMap.put(columnName, ref.getIndex());
+      }
+      targetColumnIndexMap.add(columnIndexMap);
+    }
+    return targetColumnIndexMap;
+  }
+
+  protected RelNode transformUpdateSourceRel(RelNode old, TableModify.TableInfo tableInfo, List<String> targetColumns,
+                                          List<Map<String, Integer>> sourceColumnIndexMap,
+                                          List<String> outTargetColumns, List<Integer> outTargetTables) {
+    final List<RelOptTable> targetTables = tableInfo.getTargetTables();
+    final List<Integer> targetTableIndexes = tableInfo.getTargetTableIndexes();
+
+    final Project oldProject = getProject(old);
+
+    if (null == oldProject) {
+      outTargetColumns.addAll(targetColumns);
+      outTargetTables.addAll(targetTableIndexes);
+      return old;
+    }
+    final RelNode base = oldProject.getInput();
+
+    final List<String> oldFieldNames = oldProject.getRowType().getFieldNames();
+    final List<RexNode> oldProjects = oldProject.getProjects();
+    final int oldFieldCount = oldFieldNames.size();
+    final int setSrcOffset = oldFieldCount - targetColumns.size();
+
+    final List<RexNode> baseProjects = oldProjects.subList(0, setSrcOffset);
+
+    Map<Integer, Map<String, Integer>> tableColumnIndexMap = new HashMap<>();
+
+    List<Integer> modifiedColumns = new ArrayList<>();
+    Mappings.TargetMapping modifiedColumnMapping = Mappings.target(
+        IntStream.range(0, oldFieldNames.size()).boxed().collect(Collectors.toMap(i -> i, i -> i, (o, n) -> o)),
+        oldFieldCount,
+        oldFieldCount);
+    Deque<RelNode> bases = new ArrayDeque<>(ImmutableList.of(base));
+    List<RexNode> currentProjectItems = new ArrayList<>(baseProjects);
+    List<String> currentFieldNames = new ArrayList<>(oldFieldNames.subList(0, setSrcOffset));
+    Ord.zip(targetColumns).forEach(o -> {
+      final Integer targetTableIndex = targetTableIndexes.get(o.i);
+      final Map<String, Integer> columnIndexMap =
+              tableColumnIndexMap.computeIfAbsent(targetTableIndex, sourceColumnIndexMap::get);
+
+      final int currentSrcIndex = setSrcOffset + o.i;
+      RexNode projectItem = oldProjects.get(currentSrcIndex);
+
+      final ImmutableBitSet inputBitSet = RelOptUtil.InputFinder.bits(projectItem);
+      if (inputBitSet.intersects(ImmutableBitSet.of(modifiedColumns))) {
+        final RelNode bottom = bases.peek();
+
+        final Project topProject = buildProject(currentProjectItems, currentFieldNames, bottom);
+
+        bases.push(topProject);
+
+        currentProjectItems.clear();
+        IntStream.range(0, currentFieldNames.size())
+            .mapToObj(j -> rexBuilder.makeInputRef(topProject, j))
+            .forEach(currentProjectItems::add);
+
+        projectItem = projectItem.accept(RexPermuteInputsShuttle.of(modifiedColumnMapping));
+      }
+
+      currentFieldNames.add(oldFieldNames.get(currentSrcIndex));
+      currentProjectItems.add(projectItem);
+
+      final Integer modifiedColumnIndex = columnIndexMap.get(o.e);
+      if (modifiedColumnIndex != null) {
+        modifiedColumns.add(modifiedColumnIndex);
+        modifiedColumnMapping.set(modifiedColumnIndex, currentSrcIndex);
+      }
+    });
+
+    if (bases.size() == 1) {
+      outTargetColumns.addAll(targetColumns);
+      outTargetTables.addAll(targetTableIndexes);
+      return old;
+    }
+
+    RelNode result = buildProject(currentProjectItems, currentFieldNames, bases.peek());
+
+    Map<Pair<Integer, String>, Integer> distinctTargetColumnIndexMap = new HashMap<>();
+    final List<RexNode> targetProjects = ((Project) result).getProjects();
+    final List<String> targetFieldNames = result.getRowType().getFieldNames();
+    final List<RexNode> resultProjects = new ArrayList<>(targetProjects.subList(0, setSrcOffset));
+    final List<String> resultFieldNames = new ArrayList<>(targetFieldNames.subList(0, setSrcOffset));
+    Ord.zip(targetColumns).forEach(o -> {
+      final Integer targetTableIndex = targetTableIndexes.get(o.i);
+      final Pair<Integer, String> key = Pair.of(targetTableIndex, o.e);
+
+      if (distinctTargetColumnIndexMap.containsKey(key)) {
+        final Integer index = distinctTargetColumnIndexMap.get(key);
+        resultFieldNames.set(index + setSrcOffset, targetFieldNames.get(o.i + setSrcOffset));
+        resultProjects.set(index + setSrcOffset, targetProjects.get(o.i + setSrcOffset));
+        outTargetTables.set(index, key.left);
+        outTargetColumns.set(index, key.right);
+      } else {
+        resultFieldNames.add(targetFieldNames.get(o.i + setSrcOffset));
+        resultProjects.add(targetProjects.get(o.i + setSrcOffset));
+        outTargetTables.add(key.left);
+        outTargetColumns.add(key.right);
+
+        distinctTargetColumnIndexMap.put(key, outTargetTables.size() - 1);
+      }
+    });
+
+    if (resultProjects.size() < targetProjects.size()) {
+      result = LogicalProject.create(result.getInput(0), resultProjects, resultFieldNames);
+    }
+
+    if (old instanceof Sort) {
+      result = ((Sort) old).copy(old.getTraitSet(), ImmutableList.of(result));
+    }
+
+    return result;
+  }
+
+  protected SqlSelect rewriteUpdateSourceSelect(SqlUpdate update, List<Integer> targetTableIndexes,
+                                                List<String> targetColumns, List<TableModify.TableInfoNode> srcTables,
+                                                List<Integer> outExtraTargetTableIndexes,
+                                                List<String> outExtraTargetColumns) {
+    // TODO
+    return update.getSourceSelect();
+  }
+
+  private List<TableModify.TableInfoNode> buildUpdateSourceInfo(SqlUpdate call, Map<String, Integer> outAliasTableMap,
+                                                                Map<String, List<Integer>> outColumnTableMap) {
+    final List<TableModify.TableInfoNode> srcTableInfoNodes = getUpdateSrcTables(call);
+    final SqlNodeList aliases = call.getAliases();
+    final SqlNodeList tables = call.getSourceTables();
+    for (Ord<SqlNode> o : Ord.zip(aliases)) {
+      final SqlNode alias = o.e;
+      final SqlNode table = tables.get(o.i);
+      final String aliasString = SqlValidatorUtil.alias(alias);
+
+      if (!(table instanceof SqlSelect || RelOptUtil.isUnion(table))) {
+        final RelOptTable relOptTable = srcTableInfoNodes.get(o.i).getRefTable();
+        outAliasTableMap.put(aliasString, o.i);
+        for (RelDataTypeField field : relOptTable.getRowType().getFieldList()) {
+          if (!outColumnTableMap.containsKey(field.getName())) {
+            outColumnTableMap.put(field.getName(), new ArrayList<>());
+          }
+
+          outColumnTableMap.get(field.getName()).add(o.i);
+        }
+      }
+    }
+    return srcTableInfoNodes;
+  }
+
+  protected void buildUpdateTargetColumnInfo(List<SqlNode> targetColumns, List<TableModify.TableInfoNode> tableInfoNodes,
+                                             Map<String, Integer> aliasTableIndexMap,
+                                             Map<String, List<Integer>> columnTableIndexMap,
+                                             List<String> outTargetColumnNames, List<Integer> outTargetTableIndexes) {
+    for (SqlNode node : targetColumns) {
+      final SqlIdentifier id = (SqlIdentifier) node;
+      if (id.names.size() == 2) {
+        /**
+         * UPDATE t1 a, t2 b SET a.id = 1
+         */
+        final Integer tableIndex = aliasTableIndexMap.get(id.names.get(0));
+        if (null == tableIndex) {
+          throw new AssertionError("Unknown table name: " + id.names.get(0));
+        }
+        final RelOptTable relOptTable = tableInfoNodes.get(tableIndex).getRefTable();
+
+        final RelDataType targetRowType = relOptTable.getRowType();
+        final RelDataTypeField field =
+            SqlValidatorUtil.getTargetField(targetRowType, typeFactory, id, catalogReader, relOptTable);
+        if (null == field) {
+          throw new AssertionError("Column '" + id.toString() + "' not found");
+        }
+
+        outTargetColumnNames.add(field.getName());
+        outTargetTableIndexes.add(tableIndex);
+      } else {
+        /**
+         * UPDATE t1 a, t2 b SET id = 1
+         */
+        final String columnName = Util.last(id.names);
+        final List<Integer> tableIndexes = columnTableIndexMap.get(columnName);
+        if (null == tableIndexes || tableIndexes.size() < 1) {
+          throw new AssertionError("Unknown column '" + columnName + "' in 'field list'");
+        } else if (tableIndexes.size() > 1) {
+          throw new AssertionError("Column '" + columnName + "' in field list is ambiguous");
+        }
+
+        final Integer tableIndex = tableIndexes.get(0);
+        final RelOptTable relOptTable = tableInfoNodes.get(tableIndex).getRefTable();
+        final RelDataType targetRowType = relOptTable.getRowType();
+        final RelDataTypeField field =
+            SqlValidatorUtil.getTargetField(targetRowType, typeFactory, id, catalogReader, relOptTable);
+        if (null == field) {
+          throw new AssertionError("Column '" + id.toString() + "' not found");
+        }
+
+        outTargetColumnNames.add(field.getName());
+        outTargetTableIndexes.add(tableIndex);
+      }
     }
   }
 
@@ -4988,24 +5386,36 @@ public class SqlToRelConverter {
      * @param qualified The alias of the FROM item
      * @return a {@link RexFieldAccess} or {@link RexRangeRef}, never null
      */
-    Pair<RexNode, @Nullable BiFunction<RexNode, String, RexNode>> lookupExp(
+    Pair<RexNode, Map<String, Integer>> lookupExp(
         SqlQualified qualified) {
+      return lookupExp(qualified, null);
+    }
+
+    Pair<RexNode, Map<String, Integer>> lookupExp(SqlQualified qualified, SqlValidatorScope lookupScope) {
       if (nameToNodeMap != null && qualified.prefixLength == 1) {
-        RexNode node = nameToNodeMap.get(qualified.identifier.names.get(0));
+        RexNode node = null;
+        String columnName = qualified.identifier.names.get(0);
+        for (Map.Entry<String, RexNode> entry : nameToNodeMap.entrySet()) {
+          if (entry.getKey().equalsIgnoreCase(columnName)) {
+            node = entry.getValue();
+            break;
+          }
+        }
         if (node == null) {
-          throw new AssertionError("Unknown identifier '" + qualified.identifier
-              + "' encountered while expanding expression");
+          throw new AssertionError(
+                  "Unknown identifier '" + qualified.identifier + "' encountered while expanding expression");
         }
         return Pair.of(node, null);
       }
-      final SqlNameMatcher nameMatcher =
-          scope.getValidator().getCatalogReader().nameMatcher();
-      final SqlValidatorScope.ResolvedImpl resolved =
-          new SqlValidatorScope.ResolvedImpl();
-      scope.resolve(qualified.prefix(), nameMatcher, false, resolved);
-      if (resolved.count() != 1) {
-        throw new AssertionError("no unique expression found for " + qualified
-            + "; count is " + resolved.count());
+      final SqlNameMatcher nameMatcher = scope.getValidator().getCatalogReader().nameMatcher();
+      final SqlValidatorScope.ResolvedImpl resolved = new SqlValidatorScope.ResolvedImpl();
+      if (lookupScope != null) {
+        lookupScope.resolve(qualified.prefix(), nameMatcher, false, resolved);
+      } else {
+        scope.resolve(qualified.prefix(), nameMatcher, false, resolved);
+      }
+      if (!(resolved.count() == 1)) {
+        return null;
       }
       final SqlValidatorScope.Resolve resolve = resolved.only();
       final RelDataType rowType = resolve.rowType();
@@ -5019,12 +5429,18 @@ public class SqlToRelConverter {
         final LookupContext rels =
             new LookupContext(this, inputs, systemFieldList.size());
         final RexNode node = lookup(resolve.path.steps().get(0).i, rels);
-        return Pair.of(node, (e, fieldName) -> {
-          final RelDataTypeField field =
-              requireNonNull(rowType.getField(fieldName, true, false),
-                  () -> "field " + fieldName);
-          return rexBuilder.makeFieldAccess(e, field.getIndex());
-        });
+        if (node == null) {
+          return null;
+        } else {
+          final Map<String, Integer> fieldOffsets = new HashMap<>();
+          for (RelDataTypeField f : resolve.rowType().getFieldList()) {
+            if (!fieldOffsets.containsKey(f.getName())) {
+              fieldOffsets.put(f.getName(), f.getIndex());
+            }
+          }
+          final Map<String, Integer> map = ImmutableMap.copyOf(fieldOffsets);
+          return Pair.of(node, map);
+        }
       } else {
         // We're referencing a relational expression which has not been
         // converted yet. This occurs when from items are correlated,
@@ -5045,13 +5461,7 @@ public class SqlToRelConverter {
           int i = 0;
           int offset = 0;
           for (SqlValidatorNamespace c : ancestorScope1.getChildren()) {
-            if (ancestorScope1.isChildNullable(i)) {
-              for (final RelDataTypeField f : c.getRowType().getFieldList()) {
-                builder.add(f.getName(), typeFactory.createTypeWithNullability(f.getType(), true));
-              }
-            } else {
-              builder.addAll(c.getRowType().getFieldList());
-            }
+            builder.addAll(c.getRowType().getFieldList());
             if (i == resolve.path.steps().get(0).i) {
               for (RelDataTypeField field : c.getRowType().getFieldList()) {
                 fields.put(field.getName(), field.getIndex() + offset);
@@ -5061,12 +5471,8 @@ public class SqlToRelConverter {
             offset += c.getRowType().getFieldCount();
           }
           final RexNode c =
-              rexBuilder.makeCorrel(builder.uniquify().build(), correlId);
-          final ImmutableMap<String, Integer> fieldMap = fields.build();
-          return Pair.of(c, (e, fieldName) -> {
-            final int j = requireNonNull(fieldMap.get(fieldName), "field " + fieldName);
-            return rexBuilder.makeFieldAccess(e, j);
-          });
+                  rexBuilder.makeCorrel(builder.uniquify().build(), correlId);
+          return Pair.<RexNode, Map<String, Integer>>of(c, fields.build());
         }
       }
     }
@@ -6607,6 +7013,269 @@ public class SqlToRelConverter {
 
     /** Sets {@link #isAddJsonTypeOperatorEnabled()}. */
     Config withAddJsonTypeOperatorEnabled(boolean addJsonTypeOperatorEnabled);
+  }
+
+  private static class AliasContext {
+
+    private final SqlIdentifier alias;
+    private final boolean tableAlias;
+
+    public AliasContext(SqlIdentifier alias, boolean tableAlias) {
+      this.alias = alias;
+      this.tableAlias = tableAlias;
+    }
+
+    public static AliasContext empty() {
+      return new AliasContext(SqlIdentifier.star(SqlParserPos.ZERO), false);
+    }
+
+    public SqlIdentifier getAlias() {
+      return alias;
+    }
+
+    public boolean isTableAlias() {
+      return tableAlias;
+    }
+  }
+
+  public static class HintBlackboard {
+
+    private final Deque<Map<String, SqlNodeList>> hintStack = new ArrayDeque<>();
+
+    private final Deque<AliasContext> aliasStack = new ArrayDeque<>();
+
+    private final Deque<Pair<RexNode, SqlOperator>> asOfStack = new ArrayDeque<>();
+
+    public void beginSelect() {
+      hintStack.push(new HashMap<>(2));
+    }
+
+    public void beginSelect(SqlSelect select) {
+      hintStack.push(new HashMap<>(2));
+    }
+
+    public Map<String, SqlNodeList> endFrom() {
+      return hintStack.pop();
+    }
+
+    public Map<String, SqlNodeList> currentGroups() {
+      return hintStack.peek();
+    }
+
+    public void beginAsOf(Pair<RexNode, SqlOperator> flashback) {
+      asOfStack.push(flashback);
+    }
+
+    public Pair<RexNode, SqlOperator> endAsOf() {
+      return this.asOfStack.pop();
+    }
+
+    public boolean hasAsOf() {
+      return !asOfStack.isEmpty();
+    }
+
+    public Pair<RexNode, SqlOperator> peekAsOf() {
+      return this.asOfStack.peek();
+    }
+
+    public void beginAlias(SqlNode operand0, SqlNode operand1) {
+      // remember current alias in from
+      if (operand1 instanceof SqlIdentifier) {
+        aliasStack.push(new AliasContext((SqlIdentifier) operand1, operand0 instanceof SqlIdentifier));
+      } else {
+        aliasStack.push(AliasContext.empty());
+      }
+    }
+
+    public AliasContext endAlias() {
+      return this.aliasStack.pop();
+    }
+
+    /**
+     * Get table hint with priority:
+     *
+     * <pre>
+     * 1. hint marked by same alias or table name (first com first get)
+     * 2. hint marked by default name
+     * </pre>
+     */
+    public SqlNodeList currentHints(String tableName) {
+      tableName = tableName.toLowerCase();
+
+      final AliasContext aliasCtx = aliasStack.peek();
+      final Map<String, SqlNodeList> hintGroup = hintStack.peek();
+
+      if (null == hintGroup) {
+        return new SqlNodeList(SqlParserPos.ZERO);
+      }
+
+      // default hint
+      SqlNodeList hints = null;
+      final List<SqlNode> derivedAliasHints = new ArrayList<>();
+
+      final Iterator<Map.Entry<String, SqlNodeList>> it = hintGroup.entrySet().iterator();
+      while (it.hasNext()) {
+        final Map.Entry<String, SqlNodeList> e = it.next();
+        final String k = e.getKey();
+        final SqlNodeList v = e.getValue();
+
+        // hint contains tableName
+        if (null == hints && k.equalsIgnoreCase(tableName)) {
+          if (derivedAliasHints.isEmpty()) {
+            hints = v;
+            // should not break from here, cause hints with alias need to be removed
+            continue;
+          } else {
+            final List<SqlNode> tableAliasHints = new ArrayList<>();
+            for (SqlNode hint : v) {
+              if (onlyTableAlias((SqlBasicCall) hint)) {
+                tableAliasHints.add(hint);
+              }
+            }
+
+            hints = new SqlNodeList(
+                    ImmutableList.<SqlNode>builder().addAll(derivedAliasHints).addAll(tableAliasHints).build(),
+                    SqlParserPos.ZERO);
+
+            // all task (find hints and remove hints with alias) finished
+            break;
+          }
+        }
+
+        // alias exists
+        if (null != aliasCtx) {
+          final String alias = Util.last(aliasCtx.getAlias().names);
+          if (k.equalsIgnoreCase(alias)) {
+            // hints key matches alias
+            if (null == hints) {
+              // find hints
+              if (aliasCtx.isTableAlias()) {
+                // table alias or table name only
+                for (SqlNode hint : v) {
+                  final SqlBasicCall hintCall = (SqlBasicCall) hint;
+                  final String opName = hintCall.getOperator().getName();
+
+                  if ("index".equalsIgnoreCase(opName) && hintCall.getOperandList().size() > 0) {
+                    // replace alias with table name
+                    hintCall.getOperandList().set(0, new SqlIdentifier(tableName, SqlParserPos.ZERO));
+                  }
+                }
+
+                hints = v;
+
+                // take hint with alias away
+                it.remove();
+
+                // all task (find hints and remove hints with alias) finished
+                break;
+              } else {
+                // derived table alias
+                final List<SqlNode> unmatchedHints = new ArrayList<>();
+
+                for (SqlNode hint : v) {
+                  final SqlBasicCall hintCall = (SqlBasicCall) hint;
+
+                  if (onlyTableAlias(hintCall)) {
+                    unmatchedHints.add(hintCall);
+                  } else {
+                    derivedAliasHints.add(hintCall);
+                  }
+                }
+
+                // tack hint with alias away
+                e.setValue(new SqlNodeList(unmatchedHints, SqlParserPos.ZERO));
+              }
+            } else {
+              // hints with table name specified already exists
+              // remove following hints with alias specified
+              it.remove();
+
+              // all task (find hints and remove hints with alias) finished
+              break;
+            }
+          }
+        }
+      }
+
+      if (null == hints && !derivedAliasHints.isEmpty()) {
+        hints = new SqlNodeList(ImmutableList.<SqlNode>builder().addAll(derivedAliasHints).build(),
+                SqlParserPos.ZERO);
+      }
+
+      // empty hint
+      if (null == hints) {
+        hints =
+                Optional.ofNullable(hintGroup.get(DEFAULT_HINT_GROUP)).orElse(new SqlNodeList(SqlParserPos.ZERO));
+      }
+      return hints;
+    }
+
+    private boolean onlyTableAlias(SqlBasicCall hintCall) {
+      final String opName = hintCall.getOperator().getName();
+      return "index".equalsIgnoreCase(opName) && hintCall.getOperandList().size() > 0;
+    }
+
+    /**
+     * if has join return default hint and remove it from stack
+     */
+    public SqlNodeList joinHints(SqlNode left, Blackboard bb) {
+      SqlNodeList hints = hintStack.peek().get(DEFAULT_HINT_GROUP);
+
+      if (null != hints) {
+        hintStack.peek().remove(DEFAULT_HINT_GROUP);
+      } else {
+        hints = new SqlNodeList(SqlParserPos.ZERO);
+      }
+      return hints;
+    }
+
+    /**
+     * Generate map[{first param of construct}, {hints between this and next
+     * construct}]
+     */
+    private Map<String, SqlNodeList> getGroupMap(SqlNodeList hints) {
+      Map<String, SqlNodeList> result = new LinkedHashMap<>();
+
+      for (SqlNode node : hints.getList()) {
+        final SqlNodeList hint = (SqlNodeList) node;
+
+        for (SqlNode groupNode : hint.getList()) {
+          final SqlNodeList group = (SqlNodeList) groupNode;
+
+          String tableName = DEFAULT_HINT_GROUP;
+          for (SqlNode groupHint : group.getList()) {
+            final SqlBasicCall hintCall = (SqlBasicCall) groupHint;
+            final String name = hintCall.getOperator().getName();
+            if ("construct".equalsIgnoreCase(name) && hintCall.getOperandList().size() > 0) {
+              SqlNode operand = hintCall.getOperandList().get(0);
+              tableName = getTableName(tableName, operand);
+            } else if (onlyTableAlias(hintCall)) {
+              SqlNode operand = hintCall.getOperandList().get(0);
+              tableName = getTableName(tableName, operand);
+            }
+          } // end of for
+
+          if (result.containsKey(tableName)) {
+            List<SqlNode> tmp = new ArrayList<>(result.get(tableName).getList());
+            tmp.addAll(group.getList());
+            result.put(tableName, new SqlNodeList(tmp, SqlParserPos.ZERO));
+          } else {
+            result.put(tableName, group);
+          }
+        } // end of for
+      } // end of for
+
+      return result;
+    }
+
+    private String getTableName(String tableName, SqlNode operand) {
+      if (operand instanceof SqlLiteral) {
+        tableName = ((SqlLiteral) operand).toValue().toLowerCase();
+      } else if (operand instanceof SqlIdentifier) {
+        tableName = Util.last(((SqlIdentifier) operand).names).toLowerCase();
+      }
+      return tableName;
+    }
   }
 
   /**

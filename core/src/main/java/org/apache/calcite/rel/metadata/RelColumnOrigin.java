@@ -85,7 +85,11 @@ public class RelColumnOrigin {
 
   // override Object
   @Override public int hashCode() {
-    return originTable.getQualifiedName().hashCode()
+    return (null == originTable ? 0 : originTable.getQualifiedName().hashCode())
         + iOriginColumn + (isDerived ? 313 : 0);
+  }
+
+  public String getColumnName() {
+    return getOriginTable().getRowType().getFieldNames().get(getOriginColumnOrdinal());
   }
 }

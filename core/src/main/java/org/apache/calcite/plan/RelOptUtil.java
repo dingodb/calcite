@@ -81,15 +81,11 @@ import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.rex.RexVisitorImpl;
 import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.schema.ModifiableView;
-import org.apache.calcite.sql.SqlExplainFormat;
-import org.apache.calcite.sql.SqlExplainLevel;
-import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.SqlLiteral;
-import org.apache.calcite.sql.SqlNode;
-import org.apache.calcite.sql.SqlOperator;
+import org.apache.calcite.sql.*;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.MultisetSqlType;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.sql.validate.SqlValidatorUtil;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.ImmutableBitSet;
@@ -2269,6 +2265,26 @@ public abstract class RelOptUtil {
     }
   }
 
+  public static boolean isUnion(SqlNode node) {
+    return node instanceof SqlBasicCall && node.getKind() == SqlKind.UNION;
+  }
+
+  public static int getColumnCount(SqlNode node) {
+    if (isUnion(node)) {
+      final List<SqlNode> children = ((SqlBasicCall) node).getOperandList();
+      for (int i = 0; i < children.size(); i++) {
+        final int columnCount = getColumnCount(children.get(i));
+        if (columnCount > 0) {
+          return columnCount;
+        }
+      }
+      return -1;
+    } else if (node instanceof SqlSelect) {
+      return ((SqlSelect) node).getSelectList().size();
+    }
+    return -1;
+  }
+
   /** Returns whether two relational expressions have the same row-type. */
   public static boolean equalType(String desc0, RelNode rel0, String desc1,
       RelNode rel1, Litmus litmus) {
@@ -3406,6 +3422,15 @@ public abstract class RelOptUtil {
         .build();
   }
 
+  public static RelNode createProject(
+      RelNode child,
+      List<? extends RexNode> exprList,
+      List<String> fieldNameList,
+      List<String> originalNames) {
+    return createProject(child, exprList, fieldNameList, originalNames, false,
+            RelFactories.LOGICAL_BUILDER.create(child.getCluster(), null));
+  }
+
   @Deprecated // to be removed before 2.0
   public static RelNode createProject(
       RelNode child,
@@ -3461,6 +3486,33 @@ public abstract class RelOptUtil {
     return relBuilder.push(child)
         .projectNamed(exprs, fieldNames, !optimize)
         .build();
+  }
+
+  public static RelNode createProject(
+      RelNode child,
+      List<? extends RexNode> exprs,
+      List<String> fieldNames,
+      List<String> originalNames,
+      boolean optimize,
+      RelBuilder relBuilder) {
+    final RelOptCluster cluster = child.getCluster();
+    final RelDataType rowType =
+        RexUtil.createStructType(cluster.getTypeFactory(), exprs,
+            fieldNames, SqlValidatorUtil.F_SUGGESTER);
+    final RelDataType originalRowType = RexUtil.createOriginalStructType(cluster.getTypeFactory(),
+        exprs, originalNames);
+    if (optimize
+        && RexUtil.isIdentity(exprs, child.getRowType())) {
+      if (child instanceof Project && fieldNames != null) {
+        Project childProject = (Project) child;
+        child = childProject.copy(childProject.getTraitSet(),
+                childProject.getInput(), childProject.getProjects(), rowType, originalRowType);
+      }
+      return child;
+    }
+    relBuilder.push(child);
+    relBuilder.project(exprs, rowType.getFieldNames(), originalNames, !optimize);
+    return relBuilder.build();
   }
 
   /** Returns the relational table node for {@code tableName} if it occurs within a

@@ -90,16 +90,7 @@ import org.apache.calcite.sql.fun.SqlCase;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.fun.SqlSumAggFunction;
 import org.apache.calcite.sql.parser.SqlParserPos;
-import org.apache.calcite.sql.type.AssignableOperandTypeChecker;
-import org.apache.calcite.sql.type.BasicSqlType;
-import org.apache.calcite.sql.type.OperandTypes;
-import org.apache.calcite.sql.type.ReturnTypes;
-import org.apache.calcite.sql.type.SqlOperandTypeChecker;
-import org.apache.calcite.sql.type.SqlOperandTypeInference;
-import org.apache.calcite.sql.type.SqlTypeCoercionRule;
-import org.apache.calcite.sql.type.SqlTypeFamily;
-import org.apache.calcite.sql.type.SqlTypeName;
-import org.apache.calcite.sql.type.SqlTypeUtil;
+import org.apache.calcite.sql.type.*;
 import org.apache.calcite.sql.util.IdPair;
 import org.apache.calcite.sql.util.SqlBasicVisitor;
 import org.apache.calcite.sql.util.SqlShuttle;
@@ -122,6 +113,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apiguardian.api.API;
 import org.checkerframework.checker.initialization.qual.UnknownInitialization;
 import org.checkerframework.checker.nullness.qual.KeyFor;
@@ -134,23 +126,7 @@ import org.slf4j.Logger;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.sql.SQLException;
-import java.util.AbstractList;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Deque;
-import java.util.GregorianCalendar;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.IdentityHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
@@ -1724,7 +1700,16 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
     final SqlNodeList selectList = new SqlNodeList(SqlParserPos.ZERO);
     selectList.add(SqlIdentifier.star(SqlParserPos.ZERO));
     int ordinal = 0;
-    for (SqlNode exp : call.getSourceExpressionList()) {
+    for (int i = 0; i < call.getSourceExpressionList().size(); i++) {
+      SqlNode exp = call.getSourceExpressionList().get(i);
+      SqlNode targetColumnName = call.getTargetColumnList().get(i);
+
+      if (exp instanceof SqlBasicCall && ((SqlBasicCall) exp).getOperator().getKind() == SqlKind.DEFAULT
+          && ((SqlBasicCall) exp).operandCount() == 0 && targetColumnName instanceof SqlIdentifier) {
+        exp = new SqlBasicCall(SqlStdOperatorTable.DEFAULT,
+            new SqlNode[] {targetColumnName.clone(SqlParserPos.ZERO)}, SqlParserPos.ZERO);
+      }
+
       // Force unique aliases to avoid a duplicate for Y with
       // SET X=Y
       String alias = SqlUtil.deriveAliasFromOrdinal(ordinal);
@@ -1733,11 +1718,11 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
     }
     SqlNode sourceTable = call.getTargetTable();
     SqlIdentifier alias = call.getAlias();
-    if (alias != null) {
+    if (call.singleTable() && alias != null) {
       sourceTable =
           SqlValidatorUtil.addAlias(
               sourceTable,
-              alias.getSimple());
+              alias.getLastName());
     }
     return new SqlSelect(SqlParserPos.ZERO, null, selectList, sourceTable,
         call.getCondition(), null, null, null, null, null, null, null);
@@ -2956,13 +2941,50 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
             node.getParserPosition());
       }
       SqlUpdate updateCall = (SqlUpdate) node;
-      UpdateNamespace updateNs =
-          new UpdateNamespace(
-              this,
-              updateCall,
-              enclosingNode,
-              parentScope);
-      registerNamespace(usingScope, null, updateNs, forceNullable);
+
+      if (updateCall.singleTable()) {
+        UpdateNamespace updateNs =
+            new UpdateNamespace(
+                this,
+                updateCall,
+                enclosingNode,
+                parentScope);
+        registerNamespace(usingScope, null, updateNs, forceNullable);
+      } else {
+        SqlNode targetTableNode = null;
+        for (int i = 0; i < updateCall.getSourceTables().size(); i++) {
+          final SqlNode sourceTable = updateCall.getSourceTables().get(i);
+          final SqlNode sourceAlias = updateCall.getAliases().get(i);
+
+          String alias1 = null;
+          if (sourceAlias instanceof SqlBasicCall && sourceAlias.getKind() == SqlKind.AS) {
+            alias1 = SqlValidatorUtil.alias(sourceAlias);
+          }
+
+          if (sourceTable instanceof SqlIdentifier) {
+            DmlNamespace updateNs =
+                new DmlNamespace(
+                    this,
+                    sourceTable,
+                    enclosingNode,
+                    parentScope);
+            registerNamespace(usingScope, alias1, updateNs, forceNullable);
+            if (null == targetTableNode) {
+              targetTableNode = sourceTable;
+            }
+          } else {
+            registerQuery(parentScope, usingScope, sourceTable, enclosingNode, alias1, false);
+          }
+        }
+        UpdateNamespace updateNs =
+            new UpdateNamespace(
+                this,
+                updateCall,
+                enclosingNode,
+                parentScope,
+                targetTableNode);
+        registerNamespace(usingScope, null, updateNs, forceNullable);
+      }
       registerQuery(
           parentScope,
           usingScope,
@@ -5162,6 +5184,29 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
     }
   }
 
+  private List<SqlNode> getTargetColumnRef(SqlSelect sqlSelect, SqlIdentifier targetTable) {
+    final SqlValidatorScope selectScope = getSelectScope(sqlSelect);
+    final SqlNameMatcher sqlNameMatcher = this.catalogReader.nameMatcher();
+
+    final SqlIdentifier targetTableIdentifier = targetTable;
+    final List<SqlNode> targetColumnRefs = new ArrayList<>();
+    final Set<String> aliases =
+            sqlNameMatcher.isCaseSensitive() ? new HashSet<>() : new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+    final List<Map.Entry<String, RelDataType>> fieldList = new ArrayList<>();
+    expandSelectItem(
+            targetTableIdentifier.plusStar(),
+            sqlSelect,
+            unknownType,
+            targetColumnRefs,
+            aliases,
+            fieldList,
+            false);
+    for (SqlNode expanded : targetColumnRefs) {
+      validateExpr(expanded, selectScope, null, 0);
+    }
+    return targetColumnRefs;
+  }
+
   /**
    * Locates the n'th expression in an INSERT or UPDATE query.
    *
@@ -5216,35 +5261,102 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
   }
 
   @Override public void validateUpdate(SqlUpdate call) {
-    final SqlValidatorNamespace targetNamespace = getNamespaceOrThrow(call);
-    validateNamespace(targetNamespace, unknownType);
-    final RelOptTable relOptTable = SqlValidatorUtil.getRelOptTable(
-        targetNamespace, castNonNull(catalogReader.unwrap(Prepare.CatalogReader.class)),
-        null, null);
-    final SqlValidatorTable table = relOptTable == null
-        ? getTable(targetNamespace)
-        : relOptTable.unwrapOrThrow(SqlValidatorTable.class);
-    validateUpdateValues(call, table);
+    if (call.singleTable()) {
+      final SqlValidatorNamespace targetNamespace = getNamespaceOrThrow(call);
+      validateNamespace(targetNamespace, unknownType);
+      final RelOptTable relOptTable = SqlValidatorUtil.getRelOptTable(
+              targetNamespace, castNonNull(catalogReader.unwrap(Prepare.CatalogReader.class)),
+              null, null);
+      final SqlValidatorTable table = relOptTable == null
+              ? getTable(targetNamespace)
+              : relOptTable.unwrapOrThrow(SqlValidatorTable.class);
+      validateUpdateValues(call, table);
 
-    final RelDataType targetRowType =
-        createTargetRowType(
-            table,
-            call.getTargetColumnList(),
-            true);
+      final RelDataType targetRowType =
+            createTargetRowType(
+                  table,
+                  call.getTargetColumnList(),
+                  true);
 
-    final SqlSelect select = SqlNonNullableAccessors.getSourceSelect(call);
-    validateSelect(select, targetRowType);
+      final SqlSelect select = SqlNonNullableAccessors.getSourceSelect(call);
+      validateSelect(select, targetRowType);
 
-    final RelDataType sourceRowType = getValidatedNodeType(select);
-    checkTypeAssignment(scopes.get(select),
-        table,
-        sourceRowType,
-        targetRowType,
-        call);
+      final RelDataType sourceRowType = getValidatedNodeType(select);
+      checkTypeAssignment(scopes.get(select),
+              table,
+              sourceRowType,
+              targetRowType,
+              call);
 
-    checkConstraint(table, call, targetRowType);
+      checkConstraint(table, call, targetRowType);
 
-    validateAccess(call.getTargetTable(), table, SqlAccessEnum.UPDATE);
+      validateAccess(call.getTargetTable(), table, SqlAccessEnum.UPDATE);
+
+      final List<Pair<SqlNode, List<SqlNode>>> sourceTableColumns = new ArrayList<>();
+      SqlIdentifier sourceId = call.getAlias();
+      if (null == sourceId) {
+        sourceId = (SqlIdentifier) call.getTargetTable();
+      }
+      final List<SqlNode> targetColumnRefs = getTargetColumnRef(select, sourceId);
+      sourceTableColumns.add(Pair.of(sourceId, targetColumnRefs));
+      call.setSourceTableColumns(sourceTableColumns);
+    } else {
+      final SqlSelect sqlSelect = call.getSourceSelect();
+      validateSelect(sqlSelect, unknownType);
+
+      final List<Pair<SqlNode, List<SqlNode>>> sourceTableColumns = new ArrayList<>();
+      for (SqlNode sourceAlias : call.getAliases()) {
+        SqlIdentifier sourceId = null;
+        if (sourceAlias instanceof SqlIdentifier) {
+          sourceId = (SqlIdentifier) sourceAlias;
+        } else if (sourceAlias instanceof SqlCall && sourceAlias.getKind() == SqlKind.AS) {
+          sourceId = ((SqlCall) sourceAlias).operand(1);
+        } else {
+          throw new AssertionError("Should not be here");
+        }
+
+        final List<SqlNode> targetColumnRefs = getTargetColumnRef(sqlSelect, sourceId);
+        sourceTableColumns.add(Pair.of(sourceId, targetColumnRefs));
+      }
+      call.setSourceTableColumns(sourceTableColumns);
+      List<RelDataType> relDataTypeList = new ArrayList<>();
+      for (SqlNode targetNode : call.getSourceTables()) {
+        SqlValidatorNamespace targetNamespace = getNamespace(targetNode);
+        validateNamespace(targetNamespace, unknownType);
+        relDataTypeList.add(targetNamespace.getRowType());
+      }
+
+      RelDataType relDataType = relDataTypeList.get(0);
+      for (RelDataType dataType : relDataTypeList) {
+          relDataType = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT).
+              createJoinType(relDataType, dataType);
+      }
+
+      for (SqlNode column : call.getTargetColumnList()) {
+        SqlIdentifier id = (SqlIdentifier) column;
+
+        // validate alias
+        if (id.names.size() == 2) {
+          boolean aliasIsOk = false;
+          for (SqlNode alias : call.getAliases()) {
+            String aliasId = SqlValidatorUtil.alias(alias);
+            if (StringUtils.equalsIgnoreCase(aliasId, id.names.get(0))) {
+              aliasIsOk = true;
+              break;
+            }
+          }
+          if (!aliasIsOk) {
+              throw newValidationError(id, RESOURCE.unknownTargetColumn(id.toString()));
+          }
+        }
+
+        String name = Util.last(id.names);
+        RelDataTypeField targetField = catalogReader.nameMatcher().field(relDataType, name);
+        if (targetField == null) {
+          throw newValidationError(id, RESOURCE.unknownTargetColumn(name));
+        }
+      }
+    }
   }
 
   public void validateUpdateValues(SqlUpdate call, SqlValidatorTable table) {
@@ -6547,6 +6659,13 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
     UpdateNamespace(SqlValidatorImpl validator, SqlUpdate node,
         SqlNode enclosingNode, SqlValidatorScope parentScope) {
       super(validator, node.getTargetTable(), enclosingNode, parentScope);
+      this.node = requireNonNull(node, "node");
+    }
+
+    public UpdateNamespace(SqlValidatorImpl validator, SqlUpdate node,
+                           SqlNode enclosingNode, SqlValidatorScope parentScope,
+                           SqlNode targetTable) {
+      super(validator, targetTable, enclosingNode, parentScope);
       this.node = requireNonNull(node, "node");
     }
 

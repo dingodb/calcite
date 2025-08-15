@@ -1813,6 +1813,13 @@ public class RelBuilder {
     return project(nodes, fieldNames, force, ImmutableSet.of());
   }
 
+  public RelBuilder project(Iterable<? extends RexNode> nodes,
+      Iterable<String> fieldNames,
+      List<String> originalNames,
+      boolean force) {
+    return project(nodes, fieldNames, originalNames, force, ImmutableSet.<CorrelationId>of());
+  }
+
   /**
    * The same with {@link #project(Iterable, Iterable, boolean)}, with additional
    * variablesSet param.

@@ -16,14 +16,11 @@
  */
 package org.apache.calcite.rel.logical;
 
+import com.google.common.base.Supplier;
 import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.rel.RelCollationTraitDef;
-import org.apache.calcite.rel.RelCollations;
-import org.apache.calcite.rel.RelInput;
-import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.RelShuttle;
+import org.apache.calcite.rel.*;
 import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.hint.RelHint;
@@ -120,6 +117,16 @@ public final class LogicalProject extends Project {
 
   //~ Methods ----------------------------------------------------------------
 
+  /** Creates a LogicalProject. */
+  public static LogicalProject create(final RelNode input,
+                                      final List<? extends RexNode> projects, List<String> fieldNames) {
+    final RelOptCluster cluster = input.getCluster();
+    final RelDataType rowType =
+            RexUtil.createStructType(cluster.getTypeFactory(), projects,
+                    fieldNames, SqlValidatorUtil.F_SUGGESTER);
+    return create(input, projects, rowType);
+  }
+
   /**
    * Creates a LogicalProject.
    * @deprecated Use {@link #create(RelNode, List, List, List, Set)} instead
@@ -141,6 +148,23 @@ public final class LogicalProject extends Project {
         RexUtil.createStructType(cluster.getTypeFactory(), projects,
             fieldNames, SqlValidatorUtil.F_SUGGESTER);
     return create(input, hints, projects, rowType, variablesSet);
+  }
+
+  /** Creates a LogicalProject, specifying row type rather than field names. */
+  public static LogicalProject create(final RelNode input,
+                                      final List<? extends RexNode> projects, RelDataType rowType) {
+    final RelOptCluster cluster = input.getCluster();
+    final RelMetadataQuery mq = cluster.getMetadataQuery();
+    final RelTraitSet traitSet =
+        cluster.traitSet().replace(Convention.NONE)
+            .replaceIfs(
+                  RelCollationTraitDef.INSTANCE,
+                  new Supplier<List<RelCollation>>() {
+                    public List<RelCollation> get() {
+                      return RelMdCollation.project(mq, input, projects);
+                    }
+                  });
+    return new LogicalProject(cluster, traitSet, input, projects, rowType);
   }
 
   /**
@@ -170,6 +194,12 @@ public final class LogicalProject extends Project {
       List<RexNode> projects, RelDataType rowType) {
     return new LogicalProject(getCluster(), traitSet, hints, input, projects, rowType,
         variablesSet);
+  }
+
+  @Override
+  public Project copy(RelTraitSet traitSet, RelNode input, List<RexNode> projects,
+      RelDataType rowType, RelDataType originalRowType) {
+    return new LogicalProject(getCluster(), traitSet, hints, input, projects, rowType, variablesSet);
   }
 
   @Override public RelNode accept(RelShuttle shuttle) {
