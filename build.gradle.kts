@@ -3,7 +3,7 @@ plugins {
     id("java")
     id("maven-publish")
     id("org.jetbrains.kotlin.jvm") version "1.9.20" apply false
-    id("com.vanniktech.maven.publish") version "0.33.0" apply false
+    id("com.vanniktech.maven.publish") version "0.34.0" apply false
 }
 
 group = "io.dingodb"

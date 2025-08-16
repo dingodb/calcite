@@ -21,30 +21,36 @@ dependencies {
 
 mavenPublishing {
     coordinates("io.dingodb", "calcite-linq4j", project.property("calcite.version") as String)
+    
+    pom {
+        name.set("Calcite LINQ4J")
+        description.set("DingoDB LINQ4J module providing LINQ support for Calcite")
+        url.set("https://www.dingodb.com/")
+        
+        licenses {
+            license {
+                name.set("The Apache License, Version 2.0")
+                url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+            }
+        }
+        
+        developers {
+            developer {
+                id.set("dingodb")
+                name.set("DingoDB develop team")
+                email.set("dingodb@zetyun.com")
+            }
+        }
+        
+        scm {
+            connection.set("scm:git:git://github.com/dingodb/calcite.git")
+            developerConnection.set("scm:git:ssh://github.com/dingodb/calcite.git")
+            url.set("https://github.com/dingodb/calcite")
+        }
+    }
+    
     publishToMavenCentral()
-}
-
-publishing {
-    publications {
-        create<MavenPublication>("mavenJava") {
-            from(components["java"])
-        }
-    }
-
-    repositories {
-        maven {
-            url = if (version.toString().endsWith("SNAPSHOT")) {
-                uri("https://central.sonatype.com/repository/maven-snapshots/")
-            } else {
-                uri("https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/");
-            }
-
-            credentials {
-                username = System.getenv("mavenCentralUsername")
-                password = System.getenv("mavenCentralPassword")
-            }
-        }
-    }
+    signAllPublications()
 }
 
 tasks.getByName<Test>("test") {
