@@ -240,6 +240,9 @@ public abstract class RelDataTypeSystemImpl implements RelDataTypeSystem {
 
   @Override public RelDataType deriveAvgAggType(RelDataTypeFactory typeFactory,
       RelDataType argumentType) {
+    if(argumentType.getSqlTypeName() == SqlTypeName.INTEGER || argumentType.getSqlTypeName() == SqlTypeName.BIGINT) {
+      return typeFactory.createSqlType(SqlTypeName.DECIMAL);
+    }
     return argumentType;
   }
 
