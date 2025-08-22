@@ -16,6 +16,7 @@
  */
 package org.apache.calcite.sql;
 
+import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql.validate.SqlValidatorScope;
@@ -24,6 +25,8 @@ import com.google.common.collect.ImmutableList;
 
 import org.checkerframework.checker.nullness.qual.Nullable;
 
+import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -71,6 +74,35 @@ public class SqlWith extends SqlCall {
 
   @Override public void validate(SqlValidator validator,
       SqlValidatorScope scope) {
+      // The name cannot be repeated
+      // Recursive must be accompanied by a union
+      boolean multiSqlWithItem = this.withList.stream().allMatch(sqlNode -> sqlNode instanceof SqlWithItem);
+      List<String> nameList = new ArrayList<>();
+      if (multiSqlWithItem) {
+        this.withList.forEach(sqlNode -> {
+          SqlWithItem sqlWithItem = (SqlWithItem) sqlNode;
+          String name = sqlWithItem.name.toString();
+          if (sqlWithItem.recursive.booleanValue()) {
+             if (sqlWithItem.query instanceof SqlBasicCall) {
+               SqlBasicCall union = (SqlBasicCall) sqlWithItem.query;
+               if (union.getOperator().getKind() != SqlKind.UNION) {
+                 String errFormat = "Recursive Common Table Expression '%s' should contain a UNION";
+                 throw new RuntimeException(String.format(errFormat, name));
+               }
+             } else if (sqlWithItem.query instanceof SqlSelect) {
+               String errFormat = "Recursive Common Table Expression '%s' should contain a UNION";
+               throw new RuntimeException(String.format(errFormat, name));
+             }
+          }
+          if (nameList.contains(name)) {
+             String errFormat = "Not unique table/alias: '%s'";
+             throw new RuntimeException(String.format(errFormat, name));
+          } else {
+            nameList.add(name);
+          }
+        });
+      }
+
     validator.validateWith(this, scope);
   }
 
