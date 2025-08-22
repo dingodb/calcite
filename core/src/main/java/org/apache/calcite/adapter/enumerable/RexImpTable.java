@@ -1915,6 +1915,11 @@ public class RexImpTable {
           lagResult = Expressions.convert_(
                   lagResult1,
                   java.sql.Date.class);
+        } else if ("java.lang.Object".equalsIgnoreCase(lagResult1.getType().getTypeName())
+                && "java.sql.Timestamp".equalsIgnoreCase(res.getType().getTypeName())) {
+          lagResult = Expressions.convert_(
+                  lagResult1,
+                  java.sql.Timestamp.class);
         }
       }
       // for dingo end
