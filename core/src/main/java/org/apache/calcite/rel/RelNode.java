@@ -30,6 +30,7 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexShuttle;
+import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.util.Litmus;
 
 import org.apiguardian.api.API;
@@ -114,6 +115,8 @@ public interface RelNode extends RelOptNode, Cloneable {
    * Returns the type of the rows returned by this relational expression.
    */
   @Override RelDataType getRowType();
+
+  @Override RelDataType getRowTypeWithContext(SqlOperator.CallContext context);
 
   /**
    * Returns the type of the rows expected for an input. Defaults to

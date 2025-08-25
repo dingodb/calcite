@@ -17,6 +17,7 @@
 package org.apache.calcite.plan;
 
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.sql.SqlOperator;
 
 import java.util.List;
 
@@ -64,6 +65,8 @@ public interface RelOptNode {
   // TODO: We don't want to require that nodes have very detailed row type. It
   // may not even be known at planning time.
   RelDataType getRowType();
+
+  RelDataType getRowTypeWithContext(SqlOperator.CallContext context);
 
   /**
    * Returns a string which describes the relational expression and, unlike

@@ -28,6 +28,7 @@ import org.apache.calcite.rel.hint.Hintable;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.util.Util;
 
 import com.google.common.base.Preconditions;
@@ -113,10 +114,14 @@ public abstract class SetOp extends AbstractRelNode implements Hintable {
   }
 
   @Override protected RelDataType deriveRowType() {
+    return deriveRowTypeWithContext(SqlOperator.CallContext.INVALID);
+  }
+
+  @Override protected RelDataType deriveRowTypeWithContext(SqlOperator.CallContext context) {
     final List<RelDataType> inputRowTypes =
         Util.transform(inputs, RelNode::getRowType);
     final RelDataType rowType =
-        getCluster().getTypeFactory().leastRestrictive(inputRowTypes);
+        getCluster().getTypeFactory().leastRestrictiveWithContext(inputRowTypes, context);
     if (rowType == null) {
       throw new IllegalArgumentException("Cannot compute compatible row type "
           + "for arguments to set op: "
