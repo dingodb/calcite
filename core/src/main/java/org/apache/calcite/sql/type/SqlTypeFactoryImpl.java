@@ -23,6 +23,7 @@ import org.apache.calcite.rel.type.RelDataTypeFamily;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.sql.SqlCollation;
 import org.apache.calcite.sql.SqlIntervalQualifier;
+import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.util.Util;
 
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -238,6 +239,10 @@ public class SqlTypeFactoryImpl extends RelDataTypeFactoryImpl {
   }
 
   private @Nullable RelDataType leastRestrictiveSqlType(List<RelDataType> types) {
+    return leastRestrictiveSqlTypeWithContext(types, SqlOperator.CallContext.INVALID);
+  }
+
+  private @Nullable RelDataType leastRestrictiveSqlTypeWithContext(List<RelDataType> types, SqlOperator.CallContext context) {
     RelDataType resultType = null;
     int nullCount = 0;
     int nullableCount = 0;
@@ -294,7 +299,7 @@ public class SqlTypeFactoryImpl extends RelDataTypeFactoryImpl {
         resultType = type;
         SqlTypeName sqlTypeName = resultType.getSqlTypeName();
         if (sqlTypeName == SqlTypeName.ROW) {
-          return leastRestrictiveStructuredType(types);
+          return leastRestrictiveStructuredTypeWithContext(types, context);
         }
         if (sqlTypeName == SqlTypeName.ARRAY
             || sqlTypeName == SqlTypeName.MULTISET) {

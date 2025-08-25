@@ -18,6 +18,7 @@ package org.apache.calcite.rel.type;
 
 import org.apache.calcite.linq4j.tree.Primitive;
 import org.apache.calcite.sql.SqlCollation;
+import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.type.ArraySqlType;
 import org.apache.calcite.sql.type.JavaToSqlTypeConversionRules;
 import org.apache.calcite.sql.type.MapSqlType;
@@ -212,18 +213,27 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
         }, nullable);
   }
 
-  @Override public @Nullable RelDataType leastRestrictive(List<RelDataType> types) {
+  @Override public @Nullable RelDataType leastRestrictiveWithContext(List<RelDataType> types, SqlOperator.CallContext context) {
     assert types != null;
     assert types.size() >= 1;
     RelDataType type0 = types.get(0);
     if (type0.isStruct()) {
-      return leastRestrictiveStructuredType(types);
+      return leastRestrictiveStructuredTypeWithContext(types, context);
     }
     return null;
   }
 
+  @Override public @Nullable RelDataType leastRestrictive(List<RelDataType> types) {
+    return leastRestrictiveWithContext(types, SqlOperator.CallContext.INVALID);
+  }
+
   protected @Nullable RelDataType leastRestrictiveStructuredType(
-      final List<RelDataType> types) {
+          final List<RelDataType> types) {
+    return leastRestrictiveStructuredTypeWithContext(types, SqlOperator.CallContext.INVALID);
+  }
+
+  protected @Nullable RelDataType leastRestrictiveStructuredTypeWithContext(
+      final List<RelDataType> types, SqlOperator.CallContext context) {
     final RelDataType type0 = types.get(0);
     // precheck that fieldCount is present
     if (!type0.isStruct()) {
@@ -251,8 +261,8 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
       // first type?
       final int k = j;
 
-      RelDataType type = leastRestrictive(
-          Util.transform(types, t -> t.getFieldList().get(k).getType())
+      RelDataType type = leastRestrictiveWithContext(
+          Util.transform(types, t -> t.getFieldList().get(k).getType()), context
       );
       if (type == null) {
         return null;

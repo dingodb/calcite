@@ -28,6 +28,7 @@ import org.apache.calcite.sql.SqlCallBinding;
 import org.apache.calcite.sql.SqlCollation;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNodeList;
+import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.SqlUtil;
 import org.apache.calcite.sql.validate.SqlValidatorNamespace;
@@ -440,8 +441,14 @@ public abstract class ReturnTypes {
    * @see Glossary#SQL99 SQL:1999 Part 2 Section 9.3
    */
   public static final SqlReturnTypeInference LEAST_RESTRICTIVE =
-      opBinding -> opBinding.getTypeFactory().leastRestrictive(
-          opBinding.collectOperandTypes());
+      opBinding -> {
+    if(opBinding.getOperator().getKind() == SqlKind.UNION) {
+      return opBinding.getTypeFactory().leastRestrictiveWithContext(
+          opBinding.collectOperandTypes(), SqlOperator.CallContext.IN_UNION);
+    }
+        return opBinding.getTypeFactory().leastRestrictive(
+            opBinding.collectOperandTypes());
+      };
 
   /**
    * Returns the same type as the multiset carries. The multiset type returned

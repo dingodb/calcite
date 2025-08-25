@@ -19,6 +19,7 @@ package org.apache.calcite.sql.type;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.sql.SqlCallBinding;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlOperandCountRange;
 import org.apache.calcite.sql.SqlOperator;
@@ -108,8 +109,13 @@ public class SetopOperandTypeChecker implements SqlOperandTypeChecker {
         }
       };
 
+      SqlOperator.CallContext context = SqlOperator.CallContext.INVALID;
+      if(callBinding.getOperator().getKind() == SqlKind.UNION) {
+        context = SqlOperator.CallContext.IN_UNION;
+      }
+
       final RelDataType type =
-          callBinding.getTypeFactory().leastRestrictive(columnIthTypes);
+          callBinding.getTypeFactory().leastRestrictiveWithContext(columnIthTypes, context);
       if (type == null) {
         boolean coerced = false;
         if (callBinding.isTypeCoercionEnabled()) {

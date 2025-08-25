@@ -28,12 +28,16 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.hint.Hintable;
 import org.apache.calcite.rel.hint.RelHint;
+import org.apache.calcite.rel.logical.LogicalRepeatUnion;
+import org.apache.calcite.rel.logical.LogicalUnion;
 import org.apache.calcite.rel.metadata.Metadata;
 import org.apache.calcite.rel.metadata.MetadataFactory;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexShuttle;
 import org.apache.calcite.sql.SqlExplainLevel;
+import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.util.Litmus;
 import org.apache.calcite.util.Pair;
 import org.apache.calcite.util.Util;
@@ -168,12 +172,34 @@ public abstract class AbstractRelNode implements RelNode {
     return litmus.succeed();
   }
 
-  @Override public final RelDataType getRowType() {
+  @Override public RelDataType getRowType() {
     if (rowType == null) {
-      rowType = deriveRowType();
+      if(this instanceof LogicalUnion) {
+        if (((LogicalUnion)this).kind == SqlKind.UNION) {
+          rowType = deriveRowTypeWithContext(SqlOperator.CallContext.IN_UNION);
+        } else {
+          rowType = deriveRowType();
+        }
+      } else {
+        rowType = deriveRowType();
+      }
       assert rowType != null : this;
     }
     return rowType;
+  }
+
+  @Override public final RelDataType getRowTypeWithContext(SqlOperator.CallContext context) {
+    if (rowType == null) {
+      rowType = deriveRowTypeWithContext(context);
+      assert rowType != null : this;
+    }
+    return rowType;
+  }
+
+  protected RelDataType deriveRowTypeWithContext(SqlOperator.CallContext context) {
+    // This method is only called if rowType is null, so you don't NEED to
+    // implement it if rowType is always set.
+    throw new UnsupportedOperationException();
   }
 
   protected RelDataType deriveRowType() {

@@ -85,7 +85,7 @@ public abstract class SqlOperator {
    */
   public static final int MDX_PRECEDENCE = 200;
 
-  public static enum CallContext{INVALID, IN_VALUES, IN_UPDATE_SOURCE};
+  public static enum CallContext{INVALID, IN_VALUES, IN_UPDATE_SOURCE, IN_UNION};
 
   //~ Instance fields --------------------------------------------------------
 
