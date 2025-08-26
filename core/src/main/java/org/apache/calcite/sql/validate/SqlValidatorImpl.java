@@ -1724,6 +1724,32 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
               sourceTable,
               alias.getLastName());
     }
+    if (!call.singleTable() && call.getAliases() != null) {
+      if (sourceTable.getKind() == SqlKind.JOIN) {
+        SqlNodeList aliases = new SqlNodeList(call.getAliases().getParserPosition());
+        SqlJoin join = (SqlJoin) sourceTable;
+        SqlNode left = join.getLeft();
+        SqlNode right = join.getRight();
+        SqlNode newLeft = SqlValidatorUtil.addAlias(
+              left,
+              ((SqlIdentifier) call.getAliases().get(0)).getLastName());
+        SqlNode newRight = SqlValidatorUtil.addAlias(
+              right,
+              ((SqlIdentifier) call.getAliases().get(1)).getLastName());
+        sourceTable = new SqlJoin(
+              join.getParserPosition(),
+              newLeft,
+              join.isNaturalNode(),
+              join.getJoinTypeNode(),
+              newRight,
+              join.getConditionTypeNode(),
+              join.getCondition());
+        aliases.add(newLeft);
+        aliases.add(newRight);
+        call.setTargetTable(sourceTable);
+        call.setAliases(aliases);
+      }
+    }
     return new SqlSelect(SqlParserPos.ZERO, null, selectList, sourceTable,
         call.getCondition(), null, null, null, null, null, null, null);
   }

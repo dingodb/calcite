@@ -152,6 +152,10 @@ public class SqlUpdate extends SqlCall {
     return targetTable;
   }
 
+  public void setTargetTable(SqlNode targetTable) {
+    this.targetTable = targetTable;
+  }
+
   /** Returns the alias for the target table of this UPDATE. */
   @Pure
   public @Nullable SqlIdentifier getAlias() {
@@ -184,6 +188,10 @@ public class SqlUpdate extends SqlCall {
       throw new RuntimeException("SqlUpdate not initialized");
     }
     return aliases;
+  }
+
+  public void setAliases(SqlNodeList aliases) {
+    this.aliases = aliases;
   }
 
   public boolean singleTable() {
@@ -228,11 +236,25 @@ public class SqlUpdate extends SqlCall {
         writer.startList(SqlWriter.FrameTypeEnum.SELECT, "UPDATE", "");
     final int opLeft = getOperator().getLeftPrec();
     final int opRight = getOperator().getRightPrec();
-    targetTable.unparse(writer, opLeft, opRight);
-    SqlIdentifier alias = this.alias;
-    if (alias != null) {
-      writer.keyword("AS");
-      alias.unparse(writer, opLeft, opRight);
+    if (singleTable()) {
+      targetTable.unparse(writer, opLeft, opRight);
+      if (alias != null) {
+        writer.keyword("AS");
+        alias.unparse(writer, opLeft, opRight);
+      }
+    } else {
+      for (SqlNode table : sourceTables) {
+        if (table instanceof SqlIdentifier) {
+          ((SqlIdentifier) table).unparse(writer, opLeft, opRight);
+        } else {
+          table.unparse(writer, opLeft, opRight);
+        }
+        writer.keyword("AS");
+        SqlIdentifier alias = (SqlIdentifier) aliases.get(sourceTables.indexOf(table));
+        alias.unparse(writer, opLeft, opRight);
+        writer.sep(",");
+      }
+      // targetTable.unparse(writer, opLeft, opRight);
     }
     final SqlWriter.Frame setFrame =
         writer.startList(SqlWriter.FrameTypeEnum.UPDATE_SET_LIST, "SET", "");
