@@ -353,6 +353,10 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
     return timeFrameSet;
   }
 
+  protected SqlNode getTop() {
+    return top;
+  }
+
   @Override public SqlNodeList expandStar(
       SqlNodeList selectList,
       SqlSelect select,
