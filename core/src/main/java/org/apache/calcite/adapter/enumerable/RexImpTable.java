@@ -1927,14 +1927,17 @@ public class RexImpTable {
       result.exitBlock();
       BlockStatement thenBranch = thenBlock.toBlock();
 
-      //Expression defaultValue = rexArgs.size() == 3
-      //    ? currentRowTranslator.translate(rexArgs.get(2), res.type)
-      //    : getDefaultValue(res.type);
-
       result.currentBlock().add(Expressions.declare(0, res, null));
-      result.currentBlock().add(
-          Expressions.ifThenElse(rowInRange, thenBranch,
-              Expressions.statement(Expressions.assign(res, defaultValue))));
+      if (("java.lang.Double".equalsIgnoreCase(res.getType().getTypeName()) || "double".equalsIgnoreCase(res.getType().getTypeName()))
+          && "java.math.BigDecimal".equalsIgnoreCase(defaultValue.getType().getTypeName())) {
+        result.currentBlock().add(
+                Expressions.ifThenElse(rowInRange, thenBranch,
+                        Expressions.statement(Expressions.assign(res, Expressions.call(defaultValue, BuiltInMethod.BIG_DECIMAL_DOUBLEVALUE.method)))));
+      } else {
+        result.currentBlock().add(
+                Expressions.ifThenElse(rowInRange, thenBranch,
+                        Expressions.statement(Expressions.assign(res, defaultValue))));
+      }
       return res;
     }
   }
