@@ -88,7 +88,6 @@ import org.apache.calcite.sql.SqlWithItem;
 import org.apache.calcite.sql.TableCharacteristic;
 import org.apache.calcite.sql.fun.SqlCase;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
-import org.apache.calcite.sql.fun.SqlSumAggFunction;
 import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.type.*;
 import org.apache.calcite.sql.util.IdPair;
@@ -167,6 +166,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
    * Alias prefix generated for source columns when rewriting UPDATE to MERGE.
    */
   public static final String UPDATE_ANON_PREFIX = "SYS$ANON";
+  public static final String IMPLICIT_COL_NAME = "_ROWID";
 
   //~ Instance fields --------------------------------------------------------
 
@@ -4895,7 +4895,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
         ? logicalTargetRowType
         : realTargetRowType;
 
-    checkFieldCount(insert.getTargetTable(), table, strategies,
+    checkFieldCount(insert.getTargetColumnList(), insert.getTargetTable(), table, strategies,
         targetRowTypeToValidate, realTargetRowType,
         source, logicalSourceRowType, logicalTargetRowType);
 
@@ -5027,21 +5027,23 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
    *                                make a subset of fields(start from the left first field) whose
    *                                length is equals with the source row type fields number
    */
-  private void checkFieldCount(SqlNode node, SqlValidatorTable table,
+  private void checkFieldCount(SqlNodeList targetColumnList, SqlNode node, SqlValidatorTable table,
       List<ColumnStrategy> strategies, RelDataType targetRowTypeToValidate,
       RelDataType realTargetRowType, SqlNode source,
       RelDataType logicalSourceRowType, RelDataType logicalTargetRowType) {
-    final int sourceFieldCount = logicalSourceRowType.getFieldCount();
-    final int targetFieldCount = logicalTargetRowType.getFieldCount();
-    final int targetRealFieldCount = realTargetRowType.getFieldCount();
-    if (sourceFieldCount != targetFieldCount
-        && sourceFieldCount != targetRealFieldCount) {
+    //final int sourceFieldCount = logicalSourceRowType.getFieldCount();
+    //final int targetFieldCount = logicalTargetRowType.getFieldCount();
+    //final int targetRealFieldCount = realTargetRowType.getFieldCount();
+    //if (sourceFieldCount != targetFieldCount
+    //    && sourceFieldCount != targetRealFieldCount) {
       // Allows the source row fields count to be equal with either
       // the logical or the real(excludes columns that can not insert into)
       // target row fields count.
-      throw newValidationError(node,
-          RESOURCE.unmatchInsertColumn(targetFieldCount, sourceFieldCount));
-    }
+      //throw newValidationError(node,
+      //    RESOURCE.unmatchInsertColumn(targetFieldCount, sourceFieldCount));
+    //  return;
+    //}
+    checkFieldCount(targetColumnList, node, logicalSourceRowType, logicalTargetRowType);
     // Ensure that non-nullable fields are targeted.
     for (final RelDataTypeField field : table.getRowType().getFieldList()) {
       final RelDataTypeField targetField =
@@ -5069,6 +5071,41 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
         break;
       }
     }
+  }
+
+  protected void checkFieldCount(SqlNodeList targetColumnList, SqlNode node, RelDataType logicalSourceRowType,
+                                 RelDataType logicalTargetRowType) {
+    final int sourceFieldCount = logicalSourceRowType.getFieldCount();
+    final int targetFieldCount = logicalTargetRowType.getFieldCount();
+    int implicitNum = 0;
+    int sourceImplicitNum = 0;
+
+    if (targetColumnList != null) {
+      for (SqlNode identifier : targetColumnList.getList()) {
+        if (identifier instanceof SqlIdentifier && isImplicitKey(((SqlIdentifier) identifier).getLastName())) {
+          sourceImplicitNum++;
+        }
+      }
+    } else {
+      // if there is no target column in insert sql,then use default row type
+      for (String fieldName : logicalSourceRowType.getFieldNames()) {
+        if (isImplicitKey(fieldName)) {
+          sourceImplicitNum++;
+        }
+      }
+    }
+    for (String fieldName : logicalTargetRowType.getFieldNames()) {
+      if (isImplicitKey(fieldName)) {
+        implicitNum++;
+      }
+    }
+    if ((sourceFieldCount - sourceImplicitNum) != (targetFieldCount - implicitNum)) {
+      throw newValidationError(node, RESOURCE.unmatchInsertColumn(targetFieldCount, sourceFieldCount));
+    }
+  }
+
+  public static boolean isImplicitKey(String fieldName) {
+    return IMPLICIT_COL_NAME.equals(fieldName);
   }
 
   /** Returns whether a query uses {@code DEFAULT} to populate a given

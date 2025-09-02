@@ -114,6 +114,7 @@ import static org.apache.calcite.linq4j.Nullness.castNonNull;
 import static org.apache.calcite.sql.SqlUtil.stripAs;
 
 import static java.util.Objects.requireNonNull;
+import static org.apache.calcite.sql.validate.SqlValidatorImpl.isImplicitKey;
 
 /**
  * Converts a SQL parse tree (consisting of
@@ -4075,6 +4076,9 @@ public class SqlToRelConverter {
     final List<ColumnStrategy> strategies = targetTable.getColumnStrategies();
     final List<String> targetFields = targetTable.getRowType().getFieldNames();
     for (String targetColumnName : targetColumnNames) {
+      if (isImplicitKey(targetColumnName)) {
+        continue;
+      }
       final int i = targetFields.indexOf(targetColumnName);
       switch (strategies.get(i)) {
       case STORED:
