@@ -523,6 +523,15 @@ public abstract class SqlTypeUtil {
     return typeName == SqlTypeName.INTEGER;
   }
 
+    /** Returns whether a type is TINYINT. */
+    public static boolean isTinyint(RelDataType type) {
+        SqlTypeName typeName = type.getSqlTypeName();
+        if (typeName == null) {
+            return false;
+        }
+        return typeName == SqlTypeName.TINYINT;
+    }
+
   /** Returns whether a type is numeric with exact precision. */
   public static boolean isExactNumeric(RelDataType type) {
     SqlTypeName typeName = type.getSqlTypeName();
