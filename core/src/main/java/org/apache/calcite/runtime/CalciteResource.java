@@ -1028,6 +1028,9 @@ public interface CalciteResource {
   @BaseMessage("A table function at most has one input table with row semantics. Table function ''{0}'' has multiple input tables with row semantics")
   ExInst<SqlValidatorException> multipleRowSemanticsTables(String funcName);
 
+  @BaseMessage("update not support subquery node ''{0}'' ")
+  ExInst<SqlValidatorException> updateNotSupport(String nodeinfo);
+
   @BaseMessage("MATCH_CONDITION only allowed with ASOF JOIN")
   ExInst<CalciteException> matchConditionRequiresAsof();
 
