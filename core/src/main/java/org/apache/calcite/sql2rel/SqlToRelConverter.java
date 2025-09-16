@@ -62,6 +62,7 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.*;
+import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.schema.ColumnStrategy;
 import org.apache.calcite.schema.ModifiableTable;
 import org.apache.calcite.schema.ModifiableView;
@@ -115,6 +116,7 @@ import static org.apache.calcite.sql.SqlUtil.stripAs;
 
 import static java.util.Objects.requireNonNull;
 import static org.apache.calcite.sql.validate.SqlValidatorImpl.isImplicitKey;
+import static org.apache.calcite.util.Static.RESOURCE;
 
 /**
  * Converts a SQL parse tree (consisting of
@@ -4204,7 +4206,21 @@ public class SqlToRelConverter {
         LogicalTableModify.Operation.DELETE, null, null, false);
   }
 
+  protected void checkSubqueryInSetClause(SqlUpdate call) {
+    if (call.getSourceExpressionList() != null) {
+      for (SqlNode node : call.getSourceExpressionList()) {
+        if (node instanceof SqlSelect) { // Don't allow sub-query in update set clause.
+          final CalciteContextException ex =
+                  validator.newValidationError(node, RESOURCE.updateNotSupport(node.toString()));
+          throw new RuntimeException(ex.getMessage(), ex);
+        }
+      }
+    }
+  }
+
   private RelNode convertUpdate(SqlUpdate call) {
+    checkSubqueryInSetClause(call);
+
     // Source table info
     // Map column to table it belongs to
     final Map<String, Integer> aliasTableMap = new HashMap<>();
