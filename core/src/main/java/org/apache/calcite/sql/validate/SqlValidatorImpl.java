@@ -166,7 +166,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
    * Alias prefix generated for source columns when rewriting UPDATE to MERGE.
    */
   public static final String UPDATE_ANON_PREFIX = "SYS$ANON";
-  public static final String IMPLICIT_COL_NAME = "_ROWID";
+  public static final String IMPLICIT_COL_NAME = "_DINGO_IMPLICIT_ROWID_";
 
   //~ Instance fields --------------------------------------------------------
 
