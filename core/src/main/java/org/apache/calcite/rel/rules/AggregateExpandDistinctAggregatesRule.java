@@ -256,8 +256,12 @@ public final class AggregateExpandDistinctAggregatesRule
 
     // For each set of operands, find and rewrite all calls which have that
     // set of operands.
-    for (Pair<List<Integer>, Integer> argList : distinctCallArgLists) {
-      doRewrite(relBuilder, aggregate, n++, argList.left, argList.right, refs);
+    try {
+      for (Pair<List<Integer>, Integer> argList : distinctCallArgLists) {
+        doRewrite(relBuilder, aggregate, n++, argList.left, argList.right, refs);
+      }
+    } catch (Throwable e) {
+      return;
     }
     // It is assumed doRewrite above replaces nulls in refs
     @SuppressWarnings("assignment.type.incompatible")
