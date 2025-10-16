@@ -243,7 +243,7 @@ public abstract class RelDataTypeSystemImpl implements RelDataTypeSystem {
     if(argumentType.getSqlTypeName() == SqlTypeName.TINYINT ||
        argumentType.getSqlTypeName() == SqlTypeName.INTEGER ||
        argumentType.getSqlTypeName() == SqlTypeName.BIGINT) {
-      return typeFactory.createSqlType(SqlTypeName.DECIMAL);
+      return typeFactory.createSqlType(SqlTypeName.DECIMAL, 14, 4);
     }
     return argumentType;
   }
