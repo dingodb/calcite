@@ -52,11 +52,7 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
-import java.util.AbstractList;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -64,6 +60,8 @@ import static org.apache.calcite.rel.type.RelDataTypeImpl.NON_NULLABLE_SUFFIX;
 import static org.apache.calcite.sql.type.NonNullableAccessors.getCharset;
 import static org.apache.calcite.sql.type.NonNullableAccessors.getCollation;
 import static org.apache.calcite.sql.type.NonNullableAccessors.getComponentTypeOrThrow;
+import static org.apache.calcite.sql.type.SqlTypeName.TIME;
+import static org.apache.calcite.sql.type.SqlTypeName.TIME_WITH_LOCAL_TIME_ZONE;
 import static org.apache.calcite.util.Static.RESOURCE;
 
 import static java.util.Objects.requireNonNull;
@@ -385,6 +383,13 @@ public abstract class SqlTypeUtil {
     }
 
     return type.getSqlTypeName() == SqlTypeName.DATE;
+  }
+
+  public static boolean isTime(RelDataType type) {
+    return Optional.ofNullable(type)
+            .map(RelDataType::getSqlTypeName)
+            .map(sqlTypeName -> sqlTypeName == TIME || sqlTypeName == TIME_WITH_LOCAL_TIME_ZONE)
+            .orElse(false);
   }
 
   /** Returns whether a type is TIMESTAMP. */
