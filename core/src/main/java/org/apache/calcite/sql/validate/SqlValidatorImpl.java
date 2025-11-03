@@ -6645,7 +6645,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
         || isAggregation(kind);
   }
 
-    private void expandSelectItemWithNotInGroupBy(List<SqlNode> selectItems, SqlValidatorScope scope) {
+    public void expandSelectItemWithNotInGroupBy(List<SqlNode> selectItems, SqlValidatorScope scope) {
         if (!(scope instanceof AggregatingSelectScope)) {
             return;
         }
