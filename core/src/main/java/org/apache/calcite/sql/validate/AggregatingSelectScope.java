@@ -180,7 +180,7 @@ public class AggregatingSelectScope
    *
    * @return list of grouping expressions
    */
-  private Pair<ImmutableList<SqlNode>, ImmutableList<SqlNode>> getGroupExprs() {
+  public Pair<ImmutableList<SqlNode>, ImmutableList<SqlNode>> getGroupExprs() {
     if (distinct) {
       // Cannot compute this in the constructor: select list has not been
       // expanded yet.
