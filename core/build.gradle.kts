@@ -26,7 +26,7 @@ dependencies {
     api("org.locationtech.jts:jts-core:1.19.0")
     api("org.locationtech.jts.io:jts-io-common:1.19.0")
     api("org.locationtech.proj4j:proj4j:1.2.2")
-    api("com.fasterxml.jackson.core:jackson-annotations:2.15.0")
+    api("com.fasterxml.jackson.core:jackson-annotations:2.20")
     api("com.google.errorprone:error_prone_annotations:2.5.1")
     api("com.google.guava:guava:33.3.0-jre")
     api("org.apache.calcite.avatica:avatica-core:1.26.0")
@@ -34,9 +34,9 @@ dependencies {
     api("org.checkerframework:checker-qual:3.10.0")
     api("org.slf4j:slf4j-api:1.7.25")
 
-    implementation("com.fasterxml.jackson.core:jackson-core:2.15.0")
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.15.0")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.15.0")
+    implementation("com.fasterxml.jackson.core:jackson-core:2.20.0")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.20.0")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.20.0")
     implementation("com.google.uzaygezen:uzaygezen-core:0.2") {
         exclude("log4j", "log4j").because("conflicts with log4j-slf4j-impl which uses log4j2 and" +
                 " also leaks transitively to projects depending on calcite-core")
