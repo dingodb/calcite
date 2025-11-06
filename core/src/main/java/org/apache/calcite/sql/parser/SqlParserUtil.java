@@ -22,6 +22,7 @@ import org.apache.calcite.config.CalciteSystemProperty;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.SqlBinaryOperator;
+import org.apache.calcite.sql.SqlBinaryStringLiteral;
 import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlDateLiteral;
 import org.apache.calcite.sql.SqlIntervalLiteral;
@@ -58,6 +59,7 @@ import java.io.StringReader;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -346,6 +348,10 @@ public final class SqlParserUtil {
       String s, SqlParserPos pos) {
     return parseTimestampLiteral(SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE, s,
         pos);
+  }
+
+  public static SqlBinaryStringLiteral parseBinaryStringLiteral(String s, SqlParserPos pos) {
+    return SqlLiteral.createBinaryString(s.getBytes(StandardCharsets.UTF_8), pos);
   }
 
   private static SqlTimestampLiteral parseTimestampLiteral(SqlTypeName typeName,
