@@ -57,6 +57,8 @@ public class SqlUnknownLiteral extends SqlLiteral {
       return SqlParserUtil.parseTimestampLiteral(getValue(), pos);
     case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
       return SqlParserUtil.parseTimestampWithLocalTimeZoneLiteral(getValue(), pos);
+    case BINARY:
+      return SqlParserUtil.parseBinaryStringLiteral(getValue(), pos);
     default:
       throw Util.unexpected(typeName);
     }
