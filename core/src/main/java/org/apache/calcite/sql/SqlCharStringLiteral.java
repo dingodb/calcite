@@ -26,6 +26,8 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * A character string literal.
@@ -78,7 +80,13 @@ public class SqlCharStringLiteral extends SqlAbstractStringLiteral {
       writer.literal(
           writer.getDialect().quoteStringLiteral(stringValue));
     }
-    writer.literal(nlsString.asSql(true, true, writer.getDialect()));
+    String val = nlsString.asSql(true, true, writer.getDialect());
+    val = decodePostgresUnicode(val);
+    if (val != null && val.startsWith("'") && val.endsWith("'")) {
+      writer.literal(val);
+    } else {
+      writer.literal("'" + val + "'");
+    }
   }
 
   @Override protected SqlAbstractStringLiteral concat1(List<SqlLiteral> literals) {
@@ -87,5 +95,44 @@ public class SqlCharStringLiteral extends SqlAbstractStringLiteral {
             Util.transform(literals,
                 literal -> literal.getValueAs(NlsString.class))),
         literals.get(0).getParserPosition());
+  }
+
+  public static String decodePostgresUnicode(String input) {
+    if (input == null) {
+      return null;
+    }
+
+    if (!input.startsWith("u&'") || !input.endsWith("'") || input.length() < 5) {
+      return input;
+    }
+
+    String content = input.substring(3, input.length() - 1);
+    StringBuilder result = new StringBuilder();
+    Pattern pattern = Pattern.compile("\\\\[0-9a-fA-F]{4}|\\\\.");
+    Matcher matcher = pattern.matcher(content);
+
+    int lastIndex = 0;
+    while (matcher.find()) {
+      result.append(content, lastIndex, matcher.start());
+
+      String escapeSeq = matcher.group();
+      if (escapeSeq.length() == 5 && escapeSeq.charAt(0) == '\\') {
+        String hex = escapeSeq.substring(1);
+        try {
+          int codePoint = Integer.parseInt(hex, 16);
+          result.append((char) codePoint);
+        } catch (NumberFormatException e) {
+          result.append(escapeSeq);
+        }
+      } else {
+        result.append(escapeSeq);
+      }
+
+      lastIndex = matcher.end();
+    }
+
+    result.append(content.substring(lastIndex));
+
+    return result.toString();
   }
 }

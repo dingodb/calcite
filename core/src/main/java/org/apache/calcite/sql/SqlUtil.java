@@ -29,6 +29,7 @@ import org.apache.calcite.rel.type.RelDataTypePrecedenceList;
 import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.runtime.CalciteException;
 import org.apache.calcite.runtime.Resources;
+import org.apache.calcite.sql.fun.SqlCase;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.type.SqlOperandMetadata;
@@ -53,6 +54,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 
+import org.apache.commons.lang.StringUtils;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.checkerframework.checker.nullness.qual.PolyNull;
 
@@ -321,12 +323,26 @@ public abstract class SqlUtil {
       }
       SqlIdentifier id = function.getSqlIdentifier();
       if (id == null) {
-        writer.keyword(operator.getName());
+        if (StringUtils.isEmpty(call.getAliasName())) {
+          writer.keyword(operator.getName());
+        } else if (call.isFullAlias()) {
+          writer.keyword(call.getAliasName());
+          return;
+        } else {
+          writer.keyword(call.getAliasName());
+        }
       } else {
         unparseSqlIdentifierSyntax(writer, id, true);
       }
     } else {
-      writer.print(operator.getName());
+      if (StringUtils.isEmpty(call.getAliasName())) {
+        writer.keyword(operator.getName());
+      } else if (call.isFullAlias()) {
+        writer.keyword(call.getAliasName());
+        return;
+      } else {
+        writer.keyword(call.getAliasName());
+      }
     }
     if (call.operandCount() == 0) {
       switch (call.getOperator().getSyntax()) {
@@ -836,6 +852,35 @@ public abstract class SqlUtil {
 
   public static String deriveAliasFromOrdinal(int ordinal) {
     return GENERATED_EXPR_ALIAS_PREFIX + ordinal;
+  }
+
+  public static String deriveAliasFromSqlNode(SqlNode sqlNode) {
+    if (sqlNode instanceof SqlCharStringLiteral) {
+      return ((SqlCharStringLiteral) sqlNode).toValue();
+    }
+    if (sqlNode instanceof SqlBasicCall) {
+      SqlBasicCall sqlBasicCall = (SqlBasicCall) sqlNode;
+      if (sqlBasicCall.getAliasName() != null) {
+        if (sqlBasicCall.isFullAlias()) {
+          return Util.replace(sqlBasicCall.getAliasName(), "`", "");
+        } else {
+          String sql = sqlBasicCall.toMysqlString();
+          return Util.replace(sql, "`", "");
+        }
+      }
+    } else if (sqlNode instanceof SqlCase) {
+      SqlCase sqlCase = (SqlCase) sqlNode;
+      if (sqlCase.getAliasName() != null) {
+        if (sqlCase.isFullAlias()) {
+          return Util.replace(sqlCase.getAliasName(), "`", "");
+        } else {
+          String sql = sqlCase.toMysqlString();
+          return Util.replace(sql, "`", "");
+        }
+      }
+    }
+    String deriveAlias = Util.replace(sqlNode.toString(), "`", "");
+    return deriveAlias;
   }
 
   /**

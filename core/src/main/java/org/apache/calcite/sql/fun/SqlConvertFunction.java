@@ -21,6 +21,7 @@ import org.apache.calcite.sql.SqlFunction;
 import org.apache.calcite.sql.SqlFunctionCategory;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlWriter;
+import org.apache.commons.lang.StringUtils;
 
 /**
  * Common base for the <code>CONVERT</code> and <code>TRANSLATE</code>
@@ -46,9 +47,14 @@ public class SqlConvertFunction extends SqlFunction {
       SqlCall call,
       int leftPrec,
       int rightPrec) {
-    final SqlWriter.Frame frame = writer.startFunCall(getName());
+    String name = call.getAliasName();
+
+    if (StringUtils.isEmpty(name)) {
+      name = getName();
+    }
+    final SqlWriter.Frame frame = writer.startFunCall(name);
     call.operand(0).unparse(writer, leftPrec, rightPrec);
-    writer.sep("USING");
+    writer.sep(call.getAliasStringOrDefault("using", "USING"));
     call.operand(1).unparse(writer, leftPrec, rightPrec);
     writer.endFunCall(frame);
   }

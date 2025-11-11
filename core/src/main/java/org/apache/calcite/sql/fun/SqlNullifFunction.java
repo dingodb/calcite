@@ -67,7 +67,9 @@ public class SqlNullifFunction extends SqlFunction {
     SqlNodeList thenList = new SqlNodeList(pos);
     whenList.add(operands.get(1));
     thenList.add(SqlLiteral.createNull(SqlParserPos.ZERO));
-    return SqlCase.createSwitched(pos, operands.get(0), whenList, thenList,
+    SqlNode sqlNode = SqlCase.createSwitched(pos, operands.get(0), whenList, thenList,
         SqlNode.clone(operands.get(0)));
+    sqlNode.setAliasProp(call.getAliasProp());
+    return sqlNode;
   }
 }

@@ -34,6 +34,7 @@ import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql.validate.SqlValidatorScope;
 import org.apache.calcite.util.Litmus;
+import org.apache.commons.lang.StringUtils;
 
 /**
  * An operator describing the <code>LIKE</code> and <code>SIMILAR</code>
@@ -201,11 +202,17 @@ public class SqlLikeOperator extends SqlSpecialOperator {
       int rightPrec) {
     final SqlWriter.Frame frame = writer.startList("", "");
     call.operand(0).unparse(writer, getLeftPrec(), getRightPrec());
-    writer.sep(getName());
+    String name = call.getAliasName();
+
+    if (StringUtils.isEmpty(name)) {
+      name = getName();
+    }
+    writer.sep(name);
 
     call.operand(1).unparse(writer, getLeftPrec(), getRightPrec());
     if (call.operandCount() == 3) {
-      writer.sep("ESCAPE");
+      String escapeStr = call.getAliasStringOrDefault("escape", "ESCAPE");
+      writer.sep(escapeStr);
       call.operand(2).unparse(writer, getLeftPrec(), getRightPrec());
     }
     writer.endList(frame);

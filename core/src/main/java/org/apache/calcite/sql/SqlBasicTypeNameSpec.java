@@ -166,7 +166,11 @@ public class SqlBasicTypeNameSpec extends SqlTypeNameSpec {
     if (isWithLocalTimeZone) {
       writer.keyword(stripLocalTimeZoneDef(sqlTypeName).name());
     } else {
-      writer.keyword(getTypeName().getSimple());
+      String typeSimple = getTypeName().getSimple();
+      if ("INTEGER".equalsIgnoreCase(typeSimple)) {
+        typeSimple = "int";
+      }
+      writer.keyword(typeSimple.toLowerCase());
     }
 
     if (sqlTypeName.allowsPrec() && (precision >= 0)) {

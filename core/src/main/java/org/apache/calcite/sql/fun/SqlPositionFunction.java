@@ -25,6 +25,7 @@ import org.apache.calcite.sql.SqlWriter;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SqlOperandTypeChecker;
+import org.apache.commons.lang.StringUtils;
 
 /**
  * The <code>POSITION</code> function.
@@ -57,12 +58,17 @@ public class SqlPositionFunction extends SqlFunction {
       SqlCall call,
       int leftPrec,
       int rightPrec) {
-    final SqlWriter.Frame frame = writer.startFunCall(getName());
+    String name = call.getAliasName();
+
+    if (StringUtils.isEmpty(name)) {
+      name = getName();
+    }
+    final SqlWriter.Frame frame = writer.startFunCall(name);
     call.operand(0).unparse(writer, leftPrec, rightPrec);
-    writer.sep("IN");
+    writer.sep(call.getAliasStringOrDefault("in", "IN"));
     call.operand(1).unparse(writer, leftPrec, rightPrec);
     if (3 == call.operandCount()) {
-      writer.sep("FROM");
+      writer.sep(call.getAliasStringOrDefault("from", "FROM"));
       call.operand(2).unparse(writer, leftPrec, rightPrec);
     }
     writer.endFunCall(frame);

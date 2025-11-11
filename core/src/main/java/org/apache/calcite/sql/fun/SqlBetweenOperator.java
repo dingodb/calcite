@@ -36,6 +36,7 @@ import org.apache.calcite.sql.type.SqlOperandTypeChecker;
 import org.apache.calcite.sql.util.SqlBasicVisitor;
 import org.apache.calcite.util.Litmus;
 import org.apache.calcite.util.Util;
+import org.apache.commons.lang.StringUtils;
 
 import static org.apache.calcite.util.Static.RESOURCE;
 
@@ -172,7 +173,12 @@ public class SqlBetweenOperator extends SqlInfixOperator {
     final SqlWriter.Frame frame =
         writer.startList(FRAME_TYPE, "", "");
     call.operand(VALUE_OPERAND).unparse(writer, getLeftPrec(), 0);
-    writer.sep(super.getName());
+    String name = call.getAliasName();
+
+    if (StringUtils.isEmpty(name)) {
+      name = super.getName();
+    }
+    writer.sep(name);
     writer.sep(flag.name());
 
     // If the expression for the lower bound contains a call to an AND
@@ -191,7 +197,7 @@ public class SqlBetweenOperator extends SqlInfixOperator {
     final SqlNode upper = call.operand(UPPER_OPERAND);
     int lowerPrec = new AndFinder().containsAnd(lower) ? 100 : 0;
     lower.unparse(writer, lowerPrec, lowerPrec);
-    writer.sep("AND");
+    writer.sep(call.getAliasStringOrDefault("and", "AND"));
     upper.unparse(writer, 0, getRightPrec());
     writer.endList(frame);
   }

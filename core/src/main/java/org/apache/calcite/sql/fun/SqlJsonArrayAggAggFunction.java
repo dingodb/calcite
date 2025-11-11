@@ -34,6 +34,7 @@ import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql.validate.SqlValidatorScope;
 import org.apache.calcite.util.Optionality;
 
+import org.apache.commons.lang.StringUtils;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 import java.util.Objects;
@@ -55,7 +56,8 @@ public class SqlJsonArrayAggAggFunction extends SqlAggFunction {
   @Override public void unparse(SqlWriter writer, SqlCall call, int leftPrec,
       int rightPrec) {
     assert call.operandCount() == 1;
-    final SqlWriter.Frame frame = writer.startFunCall("JSON_ARRAYAGG");
+    String jsonArrayAgg = call.getAliasStringOrDefault("json_arrayagg", "JSON_ARRAYAGG");
+    final SqlWriter.Frame frame = writer.startFunCall(jsonArrayAgg);
     call.operand(0).unparse(writer, leftPrec, rightPrec);
     writer.keyword(nullClause.sql);
     writer.endFunCall(frame);

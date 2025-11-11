@@ -36,6 +36,7 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.calcite.sql.validate.SqlValidator;
 
+import org.apache.commons.lang.StringUtils;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 import java.util.Locale;
@@ -119,13 +120,21 @@ public class SqlJsonObjectFunction extends SqlFunction {
   @Override public void unparse(SqlWriter writer, SqlCall call, int leftPrec,
       int rightPrec) {
     assert call.operandCount() % 2 == 1;
-    final SqlWriter.Frame frame = writer.startFunCall(getName());
+    String name = call.getAliasName();
+
+    if (StringUtils.isEmpty(name)) {
+      name = getName();
+    }
+    final SqlWriter.Frame frame = writer.startFunCall(name);
     SqlWriter.Frame listFrame = writer.startList("", "");
     for (int i = 1; i < call.operandCount(); i += 2) {
       writer.sep(",");
-      writer.keyword("KEY");
+      String keyStr = call.getAliasStringOrDefault("key", "KEY");
+      writer.keyword(keyStr);
       call.operand(i).unparse(writer, leftPrec, rightPrec);
-      writer.keyword("VALUE");
+      String valueStr = call.getAliasStringOrDefault("value", "VALUE");
+      writer.keyword(valueStr);
+
       call.operand(i + 1).unparse(writer, leftPrec, rightPrec);
     }
     writer.endList(listFrame);

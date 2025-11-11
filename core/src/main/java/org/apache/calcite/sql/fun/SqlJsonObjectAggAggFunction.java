@@ -59,10 +59,10 @@ public class SqlJsonObjectAggAggFunction extends SqlAggFunction {
   @Override public void unparse(SqlWriter writer, SqlCall call, int leftPrec,
       int rightPrec) {
     assert call.operandCount() == 2;
-    final SqlWriter.Frame frame = writer.startFunCall("JSON_OBJECTAGG");
-    writer.keyword("KEY");
+    final SqlWriter.Frame frame = writer.startFunCall(call.getAliasStringOrDefault("json_objectagg", "JSON_OBJECTAGG"));
+    writer.keyword(call.getAliasStringOrDefault("key", "KEY"));
     call.operand(0).unparse(writer, leftPrec, rightPrec);
-    writer.keyword("VALUE");
+    writer.keyword(call.getAliasStringOrDefault("value", "VALUE"));
     call.operand(1).unparse(writer, leftPrec, rightPrec);
     writer.keyword(nullClause.sql);
     writer.endFunCall(frame);

@@ -30,6 +30,7 @@ import org.apache.calcite.sql.validate.SqlMonotonicity;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql.validate.SqlValidatorScope;
 import org.apache.calcite.util.Util;
+import org.apache.commons.lang.StringUtils;
 
 import static org.apache.calcite.sql.validate.SqlNonNullableAccessors.getOperandLiteralValueOrThrow;
 
@@ -62,10 +63,22 @@ public class SqlExtractFunction extends SqlFunction {
       SqlCall call,
       int leftPrec,
       int rightPrec) {
-    final SqlWriter.Frame frame = writer.startFunCall(getName());
+    String name = call.getAliasName();
+    if (StringUtils.isEmpty(name)) {
+      name = getName();
+    } else if (call.isFullAlias()) {
+      writer.keyword(name);
+      return;
+    }
+    final SqlWriter.Frame frame = writer.startFunCall(name);
     SqlIntervalQualifier.asIdentifier(call.operand(0))
         .unparse(writer, 0, 0);
-    writer.sep("FROM");
+    String fromStr = call.getAliasString("from");
+    if (StringUtils.isEmpty(fromStr)) {
+      writer.sep("FROM");
+    } else {
+      writer.sep(fromStr);
+    }
     call.operand(1).unparse(writer, 0, 0);
     writer.endFunCall(frame);
   }

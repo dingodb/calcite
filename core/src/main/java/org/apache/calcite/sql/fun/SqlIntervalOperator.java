@@ -30,6 +30,7 @@ import org.apache.calcite.sql.type.InferTypes;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeTransforms;
+import org.apache.commons.lang.StringUtils;
 
 import static org.apache.calcite.sql.validate.SqlNonNullableAccessors.getOperandLiteralValueOrThrow;
 
@@ -62,7 +63,8 @@ public class SqlIntervalOperator extends SqlInternalOperator {
 
   @Override public void unparse(SqlWriter writer, SqlCall call, int leftPrec,
       int rightPrec) {
-    writer.keyword("INTERVAL");
+    String intervalStr = call.getAliasStringOrDefault("interval", "INTERVAL");
+    writer.keyword(intervalStr);
     final SqlNode expression = call.operand(0);
     final SqlIntervalQualifier intervalQualifier = call.operand(1);
     expression.unparseWithParentheses(writer, leftPrec, rightPrec,

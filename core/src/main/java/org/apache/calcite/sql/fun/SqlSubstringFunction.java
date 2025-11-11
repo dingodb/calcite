@@ -37,6 +37,7 @@ import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.calcite.sql.validate.SqlMonotonicity;
 
 import com.google.common.collect.ImmutableList;
+import org.apache.commons.lang.StringUtils;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -145,13 +146,37 @@ public class SqlSubstringFunction extends SqlFunction {
       SqlCall call,
       int leftPrec,
       int rightPrec) {
-    final SqlWriter.Frame frame = writer.startFunCall(getName());
+    String fromIdentifier;
+    String forIdentifier;
+    String name = "";
+    fromIdentifier = call.getAliasString("fromIdentifier");
+    forIdentifier = call.getAliasString("forIdentifier");
+    name = call.getAliasName();
+    
+    if (StringUtils.isEmpty(name)) {
+       name = getName();
+    }
+    if (StringUtils.isEmpty(fromIdentifier)) {
+      final SqlWriter.Frame frame = writer.startFunCall(name);
+      writer.sep(",");
+      call.operand(0).unparse(writer, leftPrec, rightPrec);
+      writer.sep(",");
+      call.operand(1).unparse(writer, leftPrec, rightPrec);
+
+      if (3 == call.operandCount()) {
+        writer.sep(",");
+        call.operand(2).unparse(writer, leftPrec, rightPrec);
+      }
+      writer.endFunCall(frame);
+      return;
+    }
+    final SqlWriter.Frame frame = writer.startFunCall(name);
     call.operand(0).unparse(writer, leftPrec, rightPrec);
-    writer.sep("FROM");
+    writer.sep(fromIdentifier);
     call.operand(1).unparse(writer, leftPrec, rightPrec);
 
     if (3 == call.operandCount()) {
-      writer.sep("FOR");
+      writer.sep(forIdentifier);
       call.operand(2).unparse(writer, leftPrec, rightPrec);
     }
 

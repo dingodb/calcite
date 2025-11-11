@@ -21,24 +21,7 @@ import org.apache.calcite.avatica.util.DateTimeUtils;
 import org.apache.calcite.config.CalciteSystemProperty;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.runtime.CalciteContextException;
-import org.apache.calcite.sql.SqlBinaryOperator;
-import org.apache.calcite.sql.SqlBinaryStringLiteral;
-import org.apache.calcite.sql.SqlCall;
-import org.apache.calcite.sql.SqlDateLiteral;
-import org.apache.calcite.sql.SqlIntervalLiteral;
-import org.apache.calcite.sql.SqlIntervalQualifier;
-import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.SqlLiteral;
-import org.apache.calcite.sql.SqlNode;
-import org.apache.calcite.sql.SqlNodeList;
-import org.apache.calcite.sql.SqlNumericLiteral;
-import org.apache.calcite.sql.SqlOperator;
-import org.apache.calcite.sql.SqlPostfixOperator;
-import org.apache.calcite.sql.SqlPrefixOperator;
-import org.apache.calcite.sql.SqlSpecialOperator;
-import org.apache.calcite.sql.SqlTimeLiteral;
-import org.apache.calcite.sql.SqlTimestampLiteral;
-import org.apache.calcite.sql.SqlUtil;
+import org.apache.calcite.sql.*;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.parser.impl.SqlParserImpl;
 import org.apache.calcite.sql.type.SqlTypeName;
@@ -52,6 +35,7 @@ import org.apache.calcite.util.trace.CalciteTrace;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
+import org.apache.commons.lang.StringUtils;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.slf4j.Logger;
 
@@ -832,8 +816,16 @@ public final class SqlParserUtil {
     }
     LOGGER.trace("Attempting to reduce {}", list);
     final OldTokenSequenceImpl tokenSequence = new OldTokenSequenceImpl(list);
+    String aliasName = null;
+    if (list != null && list.size() == 3) {
+      aliasName = list.get(1).toString();
+    }
     final SqlNode node = toTreeEx(tokenSequence, 0, 0, SqlKind.OTHER);
     LOGGER.debug("Reduced {}", node);
+    if (node instanceof SqlBasicCall && aliasName != null) {
+      SqlBasicCall sqlBasicCall = (SqlBasicCall) node;
+      sqlBasicCall.setAliasName(aliasName);
+    }
     return node;
   }
 
@@ -991,6 +983,7 @@ public final class SqlParserUtil {
   public static class ToTreeListItem {
     private final SqlOperator op;
     private final SqlParserPos pos;
+    private String aliasName;
 
     public ToTreeListItem(
         SqlOperator op,
@@ -999,8 +992,24 @@ public final class SqlParserUtil {
       this.pos = pos;
     }
 
+    public ToTreeListItem(
+            SqlOperator op,
+            SqlParserPos pos, String aliasName) {
+      this.op = op;
+      this.pos = pos;
+      this.aliasName = aliasName;
+    }
+
+    public void setAliasName(String aliasName) {
+      this.aliasName = aliasName;
+    }
+
     @Override public String toString() {
-      return op.toString();
+      if (StringUtils.isEmpty(aliasName)) {
+        return op.toString();
+      } else {
+        return aliasName;
+      }
     }
 
     public SqlOperator getOperator() {

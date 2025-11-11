@@ -32,6 +32,7 @@ import org.apache.calcite.sql.type.SqlSingleOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlTypeUtil;
 
 import com.google.common.collect.ImmutableList;
+import org.apache.commons.lang.StringUtils;
 
 /**
  * SqlOverlapsOperator represents the SQL:1999 standard {@code OVERLAPS}
@@ -54,7 +55,12 @@ public class SqlOverlapsOperator extends SqlBinaryOperator {
     final SqlWriter.Frame frame =
         writer.startList(SqlWriter.FrameTypeEnum.SIMPLE);
     arg(writer, call, leftPrec, rightPrec, 0);
-    writer.sep(getName());
+    String name = call.getAliasName();
+
+    if (StringUtils.isEmpty(name)) {
+      name = getName();
+    }
+    writer.sep(name);
     arg(writer, call, leftPrec, rightPrec, 1);
     writer.endList(frame);
   }
