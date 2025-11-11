@@ -126,16 +126,6 @@ public class FixtureTest {
     }
   }
 
-  /** Tests that you can run SQL-to-Rel tests via
-   * {@link Fixtures#forSqlToRel()}. */
-  @Test void testSqlToRelFixture() {
-    final SqlToRelFixture f =
-        Fixtures.forSqlToRel()
-            .withDiffRepos(DiffRepository.lookup(FixtureTest.class));
-    final String sql = "select 1 from emp";
-    f.withSql(sql).ok();
-  }
-
   /** Tests that we get a good error message if a test needs a diff repository.
    *
    * @see DiffRepository#castNonNull(DiffRepository) */

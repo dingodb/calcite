@@ -29,6 +29,7 @@ import org.apache.calcite.sql.SqlWriter;
 import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.type.*;
 
+import org.apache.commons.lang.StringUtils;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 import static java.util.Objects.requireNonNull;
@@ -61,7 +62,12 @@ public class SqlJsonQueryFunction extends SqlFunction {
 
   @Override public void unparse(SqlWriter writer, SqlCall call, int leftPrec,
       int rightPrec) {
-    final SqlWriter.Frame frame = writer.startFunCall(getName());
+    String name = call.getAliasName();
+
+    if (StringUtils.isEmpty(name)) {
+      name = getName();
+    }
+    final SqlWriter.Frame frame = writer.startFunCall(name);
     call.operand(0).unparse(writer, 0, 0);
     writer.sep(",", true);
     call.operand(1).unparse(writer, 0, 0);

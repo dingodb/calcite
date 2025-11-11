@@ -28,13 +28,10 @@ import org.apache.calcite.sql.validate.SqlValidatorScope;
 import org.apache.calcite.util.Litmus;
 import org.apache.calcite.util.Util;
 
+import org.apache.commons.lang.StringUtils;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collector;
 
@@ -53,6 +50,8 @@ public abstract class SqlNode implements Cloneable {
   //~ Instance fields --------------------------------------------------------
 
   protected final SqlParserPos pos;
+
+  private Properties aliasProp;
 
   //~ Constructors -----------------------------------------------------------
 
@@ -99,6 +98,76 @@ public abstract class SqlNode implements Cloneable {
     return SqlKind.OTHER;
   }
 
+  public String getAliasName() {
+    if (aliasProp != null) {
+      Object aliasName = aliasProp.get("aliasName");
+      if (aliasName instanceof String) {
+        return aliasName.toString();
+      }
+    }
+    return null;
+  }
+
+  public void setAliasName(String aliasName) {
+    putAlias("aliasName", aliasName);
+  }
+
+  public void putAlias(String key, String val) {
+    if (StringUtils.isEmpty(val) || StringUtils.isEmpty(key)) {
+      return;
+    }
+    if (aliasProp == null) {
+      this.aliasProp = new Properties();
+      this.aliasProp.put(key, val);
+    } else {
+      this.aliasProp.put(key, val);
+    }
+  }
+
+  public String getAliasStringOrDefault(String key, String defaultStr) {
+    String val = getAliasString(key);
+    if (StringUtils.isEmpty(val)) {
+      return defaultStr;
+    } else {
+      return val;
+    }
+  }
+
+  public String getAliasString(String key) {
+    if (this.aliasProp == null) {
+      return null;
+    }
+    if (key == null) {
+      return null;
+    }
+    if (this.aliasProp.containsKey(key)) {
+      return this.aliasProp.get(key).toString();
+    };
+    return null;
+  }
+
+  public boolean isFullAlias() {
+    if (aliasProp != null) {
+      Object aliasName = aliasProp.get("fullAlias");
+      if (aliasName != null) {
+        try {
+          return Boolean.parseBoolean(aliasName.toString());
+        } catch (Exception e) {
+          return false;
+        }
+      }
+    }
+    return false;
+  }
+
+  public void setAliasProp(Properties properties){
+    this.aliasProp = properties;
+  }
+
+  public Properties getAliasProp() {
+    return aliasProp;
+  }
+
   /**
    * Returns whether this node is a member of an aggregate category.
    *
@@ -133,6 +202,16 @@ public abstract class SqlNode implements Cloneable {
         .withSelectListItemsOnSeparateLines(false)
         .withUpdateSetListNewline(false)
         .withIndentation(0)).getSql();
+  }
+
+  public String toMysqlString() {
+    return toSqlString(c -> c.withDialect(AnsiSqlDialect.DEFAULT)
+            .withAlwaysUseParentheses(false)
+            .withAliasCaseSensitivity(true)
+            .withSelectListItemsOnSeparateLines(false)
+            .withUpdateSetListNewline(false)
+            .withMysqlType(true)
+            .withIndentation(0)).getSql();
   }
 
   /**

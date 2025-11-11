@@ -22,6 +22,7 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.SqlWriter;
+import org.apache.commons.lang.StringUtils;
 
 /**
  * Operator that appears in a {@code GROUP BY} clause: {@code CUBE},

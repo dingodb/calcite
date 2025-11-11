@@ -47,6 +47,7 @@ import org.apache.calcite.util.Pair;
 
 import com.google.common.collect.Iterables;
 
+import org.apache.commons.lang.StringUtils;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 import java.util.ArrayList;
@@ -343,22 +344,26 @@ public class SqlCaseOperator extends SqlOperator {
   @Override public void unparse(SqlWriter writer, SqlCall call_, int leftPrec,
       int rightPrec) {
     SqlCase kase = (SqlCase) call_;
+    if (StringUtils.isNotEmpty(kase.getAliasName()) && kase.isFullAlias()) {
+      writer.keyword(kase.getAliasName());
+      return;
+    }
     final SqlWriter.Frame frame =
-        writer.startList(SqlWriter.FrameTypeEnum.CASE, "CASE", "END");
+        writer.startList(SqlWriter.FrameTypeEnum.CASE, call_.getAliasStringOrDefault("case", "CASE"), call_.getAliasStringOrDefault("end", "END"));
     assert kase.whenList.size() == kase.thenList.size();
     if (kase.value != null) {
       kase.value.unparse(writer, 0, 0);
     }
     for (Pair<SqlNode, SqlNode> pair : Pair.zip(kase.whenList, kase.thenList)) {
-      writer.sep("WHEN");
+      writer.sep(call_.getAliasStringOrDefault("when", "WHEN"));
       pair.left.unparse(writer, 0, 0);
-      writer.sep("THEN");
+      writer.sep(call_.getAliasStringOrDefault("then", "THEN"));
       pair.right.unparse(writer, 0, 0);
     }
 
     SqlNode elseExpr = kase.elseExpr;
     if (elseExpr != null) {
-      writer.sep("ELSE");
+      writer.sep(call_.getAliasStringOrDefault("else", "ELSE"));
       elseExpr.unparse(writer, 0, 0);
     }
     writer.endList(frame);

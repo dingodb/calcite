@@ -394,6 +394,10 @@ public class SqlPrettyWriter implements SqlWriter {
     return config.alwaysUseParentheses();
   }
 
+  public boolean isMysqlType() {
+    return config.mysqlType();
+  }
+
   @Override public boolean inQuery() {
     return (frame == null)
         || (frame.frameType == FrameTypeEnum.SELECT)
@@ -937,10 +941,14 @@ public class SqlPrettyWriter implements SqlWriter {
 
   @Override public void keyword(String s) {
     maybeWhitespace(s);
-    buf.append(
-        isKeywordsLowerCase()
-            ? s.toLowerCase(Locale.ROOT)
-            : s.toUpperCase(Locale.ROOT));
+    if (config.aliasCaseSensitivity()) {
+      buf.append(s);
+    } else {
+      buf.append(
+              isKeywordsLowerCase()
+                      ? s.toLowerCase(Locale.ROOT)
+                      : s.toUpperCase(Locale.ROOT));
+    }
     if (!s.equals("")) {
       setNeedWhitespace(needWhitespaceAfter(s));
     }

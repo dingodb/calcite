@@ -34,6 +34,7 @@ import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql.validate.SqlValidatorScope;
 
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang.StringUtils;
 
 /**
  * Definition of the "FLOOR" and "CEIL" built-in SQL functions.
@@ -62,10 +63,20 @@ public class SqlFloorFunction extends SqlMonotonicUnaryFunction {
 
   @Override public void unparse(SqlWriter writer, SqlCall call, int leftPrec,
       int rightPrec) {
-    final SqlWriter.Frame frame = writer.startFunCall(getName());
+    String name = call.getAliasName();
+
+    if (StringUtils.isEmpty(name)) {
+      name = getName();
+    }
+    final SqlWriter.Frame frame = writer.startFunCall(name);
     if (call.operandCount() == 2) {
       call.operand(0).unparse(writer, 0, 100);
-      writer.sep("TO");
+      String toStr = call.getAliasString("to");
+      if (StringUtils.isEmpty(toStr)) {
+        writer.sep("TO");
+      } else {
+        writer.sep(toStr);
+      }
       SqlIntervalQualifier.asIdentifier(call.operand(1))
           .unparse(writer, 100, 0);
     } else {

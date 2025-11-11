@@ -40,6 +40,7 @@ import org.apache.calcite.util.TimeString;
 import org.apache.calcite.util.TimestampString;
 import org.apache.calcite.util.Util;
 
+import org.apache.commons.lang.StringUtils;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 import java.math.BigDecimal;
@@ -748,7 +749,11 @@ public class SqlLiteral extends SqlNode {
           value == null ? "UNKNOWN" : (Boolean) value ? "TRUE" : "FALSE");
       break;
     case NULL:
-      writer.keyword("NULL");
+      if (StringUtils.isNotEmpty(getAliasName()) && isFullAlias()) {
+        writer.keyword(getAliasName());
+      } else {
+        writer.keyword("NULL");
+      }
       break;
     case CHAR:
     case DECIMAL:
@@ -758,10 +763,18 @@ public class SqlLiteral extends SqlNode {
       throw Util.unexpected(typeName);
 
     case SYMBOL:
-      writer.keyword(String.valueOf(value));
+        if (StringUtils.isNotEmpty(getAliasName()) && isFullAlias()) {
+          writer.keyword(getAliasName());
+        } else {
+          writer.keyword(String.valueOf(value));
+        }
       break;
     default:
-      writer.literal(String.valueOf(value));
+      if (StringUtils.isNotEmpty(getAliasName()) && isFullAlias()) {
+        writer.literal(getAliasName());
+      } else {
+        writer.literal(String.valueOf(value));
+      }
     }
   }
 

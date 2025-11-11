@@ -31,6 +31,7 @@ import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql.validate.SqlValidatorNamespace;
 import org.apache.calcite.sql.validate.SqlValidatorScope;
+import org.apache.commons.lang.StringUtils;
 
 import java.util.List;
 
@@ -98,7 +99,12 @@ public class SqlMultisetQueryConstructor extends SqlSpecialOperator {
       SqlCall call,
       int leftPrec,
       int rightPrec) {
-    writer.keyword(getName());
+    String name = call.getAliasName();
+
+    if (StringUtils.isEmpty(name)) {
+      name = getName();
+    }
+    writer.keyword(name);
     final SqlWriter.Frame frame = writer.startList("(", ")");
     assert call.operandCount() == 1;
     call.operand(0).unparse(writer, leftPrec, rightPrec);

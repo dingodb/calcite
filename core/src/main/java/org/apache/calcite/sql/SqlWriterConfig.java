@@ -36,6 +36,14 @@ public interface SqlWriterConfig {
     return false;
   }
 
+  @Value.Default default boolean aliasCaseSensitivity() {
+    return true;
+  }
+
+  @Value.Default default boolean mysqlType() {
+    return false;
+  }
+
   /** Sets {@link #keywordsLowerCase}. */
   SqlWriterConfig withKeywordsLowerCase(boolean keywordsLowerCase);
 
@@ -105,6 +113,10 @@ public interface SqlWriterConfig {
 
   /** Sets {@link #lineFolding()}. */
   SqlWriterConfig withLineFolding(@Nullable LineFolding lineFolding);
+
+  SqlWriterConfig withAliasCaseSensitivity(boolean caseSensitivity);
+
+  SqlWriterConfig withMysqlType(boolean mysqlType);
 
   /** Returns the line-folding policy for the SELECT clause.
    * If not set, the value of {@link #lineFolding()} is used. */

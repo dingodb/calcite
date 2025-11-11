@@ -25,6 +25,7 @@ import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeTransforms;
+import org.apache.commons.lang.StringUtils;
 
 /**
  * The <code>JSON_EXISTS</code> function.
@@ -45,7 +46,12 @@ public class SqlJsonExistsFunction extends SqlFunction {
 
   @Override public void unparse(SqlWriter writer, SqlCall call, int leftPrec,
       int rightPrec) {
-    final SqlWriter.Frame frame = writer.startFunCall(getName());
+    String name = call.getAliasName();
+
+    if (StringUtils.isEmpty(name)) {
+      name = getName();
+    }
+    final SqlWriter.Frame frame = writer.startFunCall(name);
     call.operand(0).unparse(writer, 0, 0);
     writer.sep(",", true);
     for (int i = 1; i < call.operandCount(); i++) {

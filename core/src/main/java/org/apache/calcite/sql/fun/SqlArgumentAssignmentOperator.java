@@ -23,6 +23,7 @@ import org.apache.calcite.sql.SqlWriter;
 import org.apache.calcite.sql.type.InferTypes;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
+import org.apache.commons.lang.StringUtils;
 
 /**
  * Operator that assigns an argument to a function call to a particular named
@@ -44,7 +45,12 @@ class SqlArgumentAssignmentOperator extends SqlAsOperator {
       int rightPrec) {
     // Arguments are held in reverse order to be consistent with base class (AS).
     call.operand(1).unparse(writer, leftPrec, getLeftPrec());
-    writer.keyword(getName());
+    String name = call.getAliasName();
+
+    if (StringUtils.isEmpty(name)) {
+      name = getName();
+    }
+    writer.keyword(name);
     call.operand(0).unparse(writer, getRightPrec(), rightPrec);
   }
 

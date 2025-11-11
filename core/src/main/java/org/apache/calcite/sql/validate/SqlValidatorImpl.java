@@ -1387,6 +1387,12 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
             function.getFunctionType(), SqlSyntax.FUNCTION, overloads,
             catalogReader.nameMatcher());
         if (overloads.size() == 1) {
+            if (!call.isFullAlias()) {
+              Properties properties = new Properties();
+              properties.put("aliasName", call.toMysqlString());
+              properties.put("fullAlias", true);
+              call.setAliasProp(properties);
+            }
           ((SqlBasicCall) call).setOperator(overloads.get(0));
         }
       }

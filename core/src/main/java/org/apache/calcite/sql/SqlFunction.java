@@ -20,6 +20,7 @@ import org.apache.calcite.linq4j.function.Functions;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.parser.SqlParserPos;
+import org.apache.calcite.sql.parser.SqlParserUtil;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.SqlOperandMetadata;
 import org.apache.calcite.sql.type.SqlOperandTypeChecker;
@@ -175,7 +176,20 @@ public class SqlFunction extends SqlOperator {
       SqlCall call,
       int leftPrec,
       int rightPrec) {
-    getSyntax().unparse(writer, this, call, leftPrec, rightPrec);
+      SqlOperator sqlOperator = call.getOperator();
+      if ("@@".equalsIgnoreCase(sqlOperator.getName()) || "@".equalsIgnoreCase(sqlOperator.getName())) {
+        writer.print(sqlOperator.getName());
+        if (!call.getOperandList().isEmpty()) {
+          String operand = call.getOperandList().get(0).toString();
+          operand = SqlParserUtil.trim(operand, "'");
+          writer.print(operand);
+        }
+      } else if ("database".equalsIgnoreCase(sqlOperator.getName())
+              || "schema".equalsIgnoreCase(sqlOperator.getName()) || "now".equalsIgnoreCase(sqlOperator.getName())) {
+        writer.keyword(sqlOperator.getName() + "()");
+      } else {
+        getSyntax().unparse(writer, this, call, leftPrec, rightPrec);
+      }
   }
 
   /**

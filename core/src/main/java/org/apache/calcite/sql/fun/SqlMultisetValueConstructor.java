@@ -30,6 +30,7 @@ import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SqlTypeUtil;
 
+import org.apache.commons.lang.StringUtils;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 import java.util.List;
@@ -110,7 +111,12 @@ public class SqlMultisetValueConstructor extends SqlSpecialOperator {
       SqlCall call,
       int leftPrec,
       int rightPrec) {
-    writer.keyword(getName()); // "MULTISET" or "ARRAY"
+    String name = call.getAliasName();
+
+    if (StringUtils.isEmpty(name)) {
+      name = getName();
+    }
+    writer.keyword(name); // "MULTISET" or "ARRAY"
     final SqlWriter.Frame frame = writer.startList("[", "]");
     for (SqlNode operand : call.getOperandList()) {
       writer.sep(",");

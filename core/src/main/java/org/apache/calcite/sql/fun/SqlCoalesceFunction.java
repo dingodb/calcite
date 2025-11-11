@@ -78,6 +78,10 @@ public class SqlCoalesceFunction extends SqlFunction {
     }
     SqlNode elseExpr = Util.last(operands);
     assert call.getFunctionQuantifier() == null;
-    return SqlCase.createSwitched(pos, null, whenList, thenList, elseExpr);
+    SqlNode sqlNode = SqlCase.createSwitched(pos, null, whenList, thenList, elseExpr);
+    if (call.getAliasProp() != null) {
+      sqlNode.setAliasProp(call.getAliasProp());
+    }
+    return sqlNode;
   }
 }

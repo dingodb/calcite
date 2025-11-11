@@ -361,7 +361,11 @@ public class SqlValidatorUtil {
       if (ordinal < 0) {
         return null;
       } else {
-        return SqlUtil.deriveAliasFromOrdinal(ordinal);
+        String alias = SqlUtil.deriveAliasFromSqlNode(node);
+        if(alias.length()>255){
+          return SqlUtil.deriveAliasFromOrdinal(ordinal);
+        }
+        return alias;
       }
     }
   }

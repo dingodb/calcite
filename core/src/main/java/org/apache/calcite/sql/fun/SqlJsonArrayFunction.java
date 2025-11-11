@@ -33,6 +33,7 @@ import org.apache.calcite.sql.type.SqlOperandCountRanges;
 import org.apache.calcite.sql.type.SqlOperandTypeChecker;
 import org.apache.calcite.sql.validate.SqlValidator;
 
+import org.apache.commons.lang.StringUtils;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 import java.util.Locale;
@@ -81,7 +82,12 @@ public class SqlJsonArrayFunction extends SqlFunction {
   @Override public void unparse(SqlWriter writer, SqlCall call, int leftPrec,
       int rightPrec) {
     assert call.operandCount() >= 1;
-    final SqlWriter.Frame frame = writer.startFunCall(getName());
+    String name = call.getAliasName();
+
+    if (StringUtils.isEmpty(name)) {
+      name = getName();
+    }
+    final SqlWriter.Frame frame = writer.startFunCall(name);
     SqlWriter.Frame listFrame = writer.startList("", "");
     for (int i = 1; i < call.operandCount(); i++) {
       writer.sep(",");

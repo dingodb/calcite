@@ -37,6 +37,7 @@ import org.apache.calcite.sql.type.SqlTypeTransforms;
 
 import com.google.common.collect.ImmutableList;
 
+import org.apache.commons.lang.StringUtils;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 import java.util.Arrays;
@@ -115,7 +116,12 @@ public class SqlJsonValueFunction extends SqlFunction {
   }
 
   @Override public void unparse(SqlWriter writer, SqlCall call, int leftPrec, int rightPrec) {
-    final SqlWriter.Frame frame = writer.startFunCall(getName());
+    String name = call.getAliasName();
+
+    if (StringUtils.isEmpty(name)) {
+      name = getName();
+    }
+    final SqlWriter.Frame frame = writer.startFunCall(name);
     call.operand(0).unparse(writer, leftPrec, rightPrec);
     writer.sep(",", true);
     for (int i = 1; i < call.operandCount(); i++) {

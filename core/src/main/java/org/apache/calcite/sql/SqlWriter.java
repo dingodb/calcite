@@ -542,6 +542,8 @@ public interface SqlWriter {
    */
   boolean isAlwaysUseParentheses();
 
+  boolean isMysqlType();
+
   /**
    * Returns whether we are currently in a query context (SELECT, INSERT,
    * UNION, INTERSECT, EXCEPT, and the ORDER BY operator).

@@ -48,7 +48,7 @@ public class SqlColumnListConstructor extends SqlSpecialOperator {
       SqlCall call,
       int leftPrec,
       int rightPrec) {
-    writer.keyword("ROW");
+    writer.keyword(call.getAliasStringOrDefault("row", "ROW"));
     final SqlWriter.Frame frame = writer.startList("(", ")");
     for (SqlNode operand : call.getOperandList()) {
       writer.sep(",");

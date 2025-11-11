@@ -40,6 +40,7 @@ import org.apache.calcite.sql.validate.SqlValidatorImpl;
 
 import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.SetMultimap;
+import org.apache.commons.lang.StringUtils;
 
 import java.text.Collator;
 import java.util.Objects;
@@ -177,11 +178,21 @@ public class SqlCastFunction extends SqlFunction {
       int leftPrec,
       int rightPrec) {
     assert call.operandCount() == 2;
-    final SqlWriter.Frame frame = writer.startFunCall(getName());
+    String name = call.getAliasName();
+
+    if (StringUtils.isEmpty(name)) {
+      name = getName();
+    } else if (call.isFullAlias()) {
+      writer.keyword(name);
+      return;
+    }
+    final SqlWriter.Frame frame = writer.startFunCall(name);
     call.operand(0).unparse(writer, 0, 0);
-    writer.sep("AS");
+    String asStr = call.getAliasStringOrDefault("as", "AS");
+    writer.sep(asStr);
     if (call.operand(1) instanceof SqlIntervalQualifier) {
-      writer.sep("INTERVAL");
+      String intervalStr = call.getAliasStringOrDefault("interval", "INTERVAL");
+      writer.sep(intervalStr);
     }
     call.operand(1).unparse(writer, 0, 0);
     writer.endFunCall(frame);
