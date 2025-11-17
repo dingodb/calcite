@@ -1015,6 +1015,16 @@ public class SqlPrettyWriter implements SqlWriter {
     buf.append(x);
   }
 
+  @Override
+  public void print(String s, boolean ignoreWhitespace) {
+    if (ignoreWhitespace) {
+      buf.append(s);
+    } else {
+      maybeWhitespace(s);
+      buf.append(s);
+    }
+  }
+
   @Override public void identifier(String name, boolean quoted) {
     // If configured globally or the original identifier is quoted,
     // then quotes the identifier.

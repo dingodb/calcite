@@ -359,6 +359,9 @@ public interface SqlWriter {
   @Pure
   void print(String s);
 
+  @Pure
+  void print(String s, boolean ignoreWhitespace);
+
   /**
    * Prints an integer.
    *

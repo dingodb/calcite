@@ -401,6 +401,10 @@ public abstract class SqlUtil {
       SqlWriter writer,
       SqlIdentifier identifier,
       boolean asFunctionID) {
+    if (identifier.isFullAlias() && StringUtils.isNotEmpty(identifier.getAliasName())) {
+      writer.print(identifier.getAliasName(), true);
+      return;
+    }
     final boolean isUnquotedSimple = identifier.isSimple()
         && !identifier.getParserPosition().isQuoted();
     final SqlOperator operator = isUnquotedSimple
