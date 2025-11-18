@@ -36,9 +36,18 @@ public class DdlExecutorImpl implements DdlExecutor, ReflectiveVisitor {
       ReflectUtil.createMethodDispatcher(void.class, this, "execute",
           SqlNode.class, CalcitePrepare.Context.class);
 
+  private final ReflectUtil.MethodDispatcher<DdlResult> dispatcher1 =
+          ReflectUtil.createMethodDispatcher(DdlResult.class, this, "execute1",
+                  SqlNode.class, CalcitePrepare.Context.class);
+
   @Override public void executeDdl(CalcitePrepare.Context context,
       SqlNode node) {
     dispatcher.invoke(node, context);
+  }
+
+  @Override
+  public DdlResult executeDdl1(CalcitePrepare.Context context, SqlNode node) {
+    return dispatcher1.invoke(node, context);
   }
 
   /** Template for methods that execute DDL commands.
@@ -47,7 +56,7 @@ public class DdlExecutorImpl implements DdlExecutor, ReflectiveVisitor {
    * because a {@link SqlNode} is not DDL, but overloaded methods such as
    * {@code public void execute(SqlCreateFoo, CalcitePrepare.Context)} are
    * called via reflection. */
-  public void execute(SqlNode node, CalcitePrepare.Context context) {
+  public DdlResult execute(SqlNode node, CalcitePrepare.Context context) {
     throw new UnsupportedOperationException("DDL not supported: " + node);
   }
 }
