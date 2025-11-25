@@ -115,6 +115,7 @@ import static org.apache.calcite.linq4j.Nullness.castNonNull;
 import static org.apache.calcite.sql.SqlUtil.stripAs;
 
 import static java.util.Objects.requireNonNull;
+import static org.apache.calcite.sql.validate.SqlValidatorImpl.IMPLICIT_COL_NAME;
 import static org.apache.calcite.sql.validate.SqlValidatorImpl.isImplicitKey;
 import static org.apache.calcite.util.Static.RESOURCE;
 
@@ -3823,9 +3824,34 @@ public class SqlToRelConverter {
     assert targetRowType != null;
     RelNode sourceRel =
         convertQueryRecursive(call.getSource(), true, targetRowType).project();
+    if (sourceRel instanceof LogicalProject && call.getSource() instanceof SqlSelect) {
+      sourceRel = ignoreImplicitCol((LogicalProject) sourceRel);
+    }
     RelNode massagedRel = convertColumnList(call, sourceRel);
 
     return createModify(targetTable, massagedRel);
+  }
+
+  public LogicalProject ignoreImplicitCol(LogicalProject logicalProject) {
+    int hiddenIdex = -1;
+    for (int i = 0; i < logicalProject.getRowType().getFieldNames().size(); i ++) {
+      if (IMPLICIT_COL_NAME.equalsIgnoreCase(logicalProject.getRowType().getFieldNames().get(i))) {
+        hiddenIdex = i;
+      }
+    }
+    if (hiddenIdex >= 0) {
+      List<RexNode> newRexNode = new ArrayList<>();
+      List<String> fieldNameList = new ArrayList<>();
+      for (int i = 0; i < logicalProject.getProjects().size(); i++) {
+        if (i == hiddenIdex) {
+          continue;
+        }
+        newRexNode.add(logicalProject.getProjects().get(i));
+        fieldNameList.add(logicalProject.getRowType().getFieldNames().get(i));
+      }
+      return LogicalProject.create(logicalProject.getInput(), newRexNode, fieldNameList);
+    }
+    return logicalProject;
   }
 
   /** Creates a relational expression to modify a table or modifiable view. */

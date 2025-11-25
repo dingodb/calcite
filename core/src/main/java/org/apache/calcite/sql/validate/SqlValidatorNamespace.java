@@ -115,6 +115,10 @@ public interface SqlValidatorNamespace {
    */
   void validate(RelDataType targetRowType);
 
+  default void validate(RelDataType targetRowType, boolean ignoreImplicitName) {
+
+  }
+
   /**
    * Returns the parse tree node at the root of this namespace.
    *

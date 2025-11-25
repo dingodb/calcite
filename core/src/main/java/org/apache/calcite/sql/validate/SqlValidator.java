@@ -156,6 +156,10 @@ public interface SqlValidator {
       SqlNode topNode,
       Map<String, RelDataType> nameToTypeMap);
 
+  default void validateQuery(SqlNode node, SqlValidatorScope scope,
+                     RelDataType targetRowType, boolean ignoreImplicitName) {
+
+  }
   /**
    * Checks that a query is valid.
    *

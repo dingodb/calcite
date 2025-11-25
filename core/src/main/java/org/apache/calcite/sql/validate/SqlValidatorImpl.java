@@ -413,6 +413,11 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
     return parentCursorMap.get(columnListParamName);
   }
 
+  private boolean expandSelectItem(final SqlNode selectItem, SqlSelect select,
+                                   RelDataType targetType, List<SqlNode> selectItems, Set<String> aliases,
+                                   List<Map.Entry<String, RelDataType>> fields, boolean includeSystemVars) {
+    return expandSelectItem(selectItem, select, targetType, selectItems, aliases, fields, includeSystemVars, false);
+  }
   /**
    * If <code>selectItem</code> is "*" or "TABLE.*", expands it and returns
    * true; otherwise writes the unexpanded item.
@@ -427,10 +432,15 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
    */
   private boolean expandSelectItem(final SqlNode selectItem, SqlSelect select,
        RelDataType targetType, List<SqlNode> selectItems, Set<String> aliases,
-       List<Map.Entry<String, RelDataType>> fields, boolean includeSystemVars) {
+       List<Map.Entry<String, RelDataType>> fields, boolean includeSystemVars, boolean ignoreImplicitName) {
     final SelectScope scope = (SelectScope) getWhereScope(select);
     if (expandStar(selectItems, aliases, fields, includeSystemVars, scope,
         selectItem)) {
+      if (ignoreImplicitName) {
+        selectItems.removeIf(sqlNode -> sqlNode.toString().contains(IMPLICIT_COL_NAME));
+        aliases.remove(IMPLICIT_COL_NAME);
+        fields.removeIf(entry -> entry.getKey().equalsIgnoreCase(IMPLICIT_COL_NAME));
+      }
       return true;
     }
 
@@ -1062,7 +1072,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
   }
 
   @Override public void validateQuery(SqlNode node, SqlValidatorScope scope,
-      RelDataType targetRowType) {
+                                      RelDataType targetRowType, boolean ignoreImplicitName) {
     final SqlValidatorNamespace ns = getNamespaceOrThrow(node, scope);
     if (node.getKind() == SqlKind.TABLESAMPLE) {
       List<SqlNode> operands = ((SqlCall) node).getOperandList();
@@ -1070,30 +1080,35 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
       if (sampleSpec instanceof SqlSampleSpec.SqlTableSampleSpec) {
         validateFeature(RESOURCE.sQLFeature_T613(), node.getParserPosition());
       } else if (sampleSpec
-          instanceof SqlSampleSpec.SqlSubstitutionSampleSpec) {
+              instanceof SqlSampleSpec.SqlSubstitutionSampleSpec) {
         validateFeature(RESOURCE.sQLFeatureExt_T613_Substitution(),
-            node.getParserPosition());
+                node.getParserPosition());
       }
     }
 
-    validateNamespace(ns, targetRowType);
+    validateNamespace(ns, targetRowType, ignoreImplicitName);
     switch (node.getKind()) {
-    case EXTEND:
-      // Until we have a dedicated namespace for EXTEND
-      deriveType(requireNonNull(scope, "scope"), node);
-      break;
-    default:
-      break;
+      case EXTEND:
+        // Until we have a dedicated namespace for EXTEND
+        deriveType(requireNonNull(scope, "scope"), node);
+        break;
+      default:
+        break;
     }
     if (node == top) {
       validateModality(node);
     }
     validateAccess(
-        node,
-        ns.getTable(),
-        SqlAccessEnum.SELECT);
+            node,
+            ns.getTable(),
+            SqlAccessEnum.SELECT);
 
     validateSnapshot(node, scope, ns);
+  }
+
+  @Override public void validateQuery(SqlNode node, SqlValidatorScope scope,
+      RelDataType targetRowType) {
+    validateQuery(node, scope, targetRowType, false);
   }
 
   /**
@@ -1106,6 +1121,15 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
   protected void validateNamespace(final SqlValidatorNamespace namespace,
       RelDataType targetRowType) {
     namespace.validate(targetRowType);
+    SqlNode node = namespace.getNode();
+    if (node != null) {
+      setValidatedNodeType(node, namespace.getType());
+    }
+  }
+
+  protected void validateNamespace(final SqlValidatorNamespace namespace,
+                                   RelDataType targetRowType, boolean ignoreImplicitName) {
+    namespace.validate(targetRowType, ignoreImplicitName);
     SqlNode node = namespace.getNode();
     if (node != null) {
       setValidatedNodeType(node, namespace.getType());
@@ -3796,6 +3820,12 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
     return field.getType();
   }
 
+  protected void validateSelect(
+          SqlSelect select,
+          RelDataType targetRowType) {
+    validateSelect(select, targetRowType, false);
+  }
+
   /**
    * Validates a SELECT statement.
    *
@@ -3805,7 +3835,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
    */
   protected void validateSelect(
       SqlSelect select,
-      RelDataType targetRowType) {
+      RelDataType targetRowType, boolean ignoreImplicitName) {
     assert targetRowType != null;
     // Namespace is either a select namespace or a wrapper around one.
     final SelectNamespace ns =
@@ -3877,7 +3907,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
     // depend on the GROUP BY list, or the window function might reference
     // window name in the WINDOW clause etc.
     final RelDataType rowType =
-        validateSelectList(selectItems, select, targetRowType);
+        validateSelectList(selectItems, select, targetRowType, ignoreImplicitName);
     ns.setType(rowType);
     validateHavingClause(select);
 
@@ -4642,7 +4672,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
   protected RelDataType validateSelectList(
       final SqlNodeList selectItems,
       SqlSelect select,
-      RelDataType targetRowType) {
+      RelDataType targetRowType, boolean ignoreImplicitName) {
     // First pass, ensure that aliases are unique. "*" and "TABLE.*" items
     // are ignored.
 
@@ -4676,7 +4706,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
             expandedSelectItems,
             aliases,
             fieldList,
-            false);
+            false, ignoreImplicitName);
       }
     }
     expandSelectItemWithNotInGroupBy(expandedSelectItems, selectScope);
@@ -4869,7 +4899,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
     final SqlNode source = insert.getSource();
     if (source instanceof SqlSelect) {
       final SqlSelect sqlSelect = (SqlSelect) source;
-      validateSelect(sqlSelect, targetRowType);
+      validateSelect(sqlSelect, targetRowType, true);
     } else {
       final SqlValidatorScope scope = scopes.get(source);
       requireNonNull(scope, "scope");
