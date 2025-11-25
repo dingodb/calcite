@@ -56,7 +56,7 @@ public class WithNamespace extends AbstractNamespace {
     }
     final SqlValidatorScope scope2 =
         validator.getWithScope(Util.last(with.withList));
-    validator.validateQuery(with.body, scope2, targetRowType);
+    validator.validateQuery(with.body, scope2, targetRowType, true);
     final RelDataType rowType = validator.getValidatedNodeType(with.body);
     validator.setValidatedNodeType(with, rowType);
     return rowType;

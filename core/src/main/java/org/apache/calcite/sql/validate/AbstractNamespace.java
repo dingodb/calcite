@@ -102,6 +102,30 @@ abstract class AbstractNamespace implements SqlValidatorNamespace {
     }
   }
 
+  @Override public final void validate(RelDataType targetRowType, boolean ignoreImplicitName) {
+    switch (status) {
+      case UNVALIDATED:
+        try {
+          status = SqlValidatorImpl.Status.IN_PROGRESS;
+          Preconditions.checkArgument(rowType == null,
+              "Namespace.rowType must be null before validate has been called");
+          RelDataType type = validateImpl(targetRowType, ignoreImplicitName);
+          Preconditions.checkArgument(type != null,
+              "validateImpl() returned null");
+          setType(type);
+        } finally {
+          status = SqlValidatorImpl.Status.VALID;
+        }
+        break;
+      case IN_PROGRESS:
+        throw new AssertionError("Cycle detected during type-checking");
+      case VALID:
+        break;
+      default:
+        throw Util.unexpected(status);
+    }
+  }
+
   /**
    * Validates this scope and returns the type of the records it returns.
    * External users should call {@link #validate}, which uses the
@@ -113,6 +137,10 @@ abstract class AbstractNamespace implements SqlValidatorNamespace {
    *                      type 'unknown'.
    */
   protected abstract RelDataType validateImpl(RelDataType targetRowType);
+
+  protected RelDataType validateImpl(RelDataType targetRowType, boolean ignoreImplicitName) {
+    return validateImpl(targetRowType);
+  }
 
   @Override public RelDataType getRowType() {
     if (rowType == null) {

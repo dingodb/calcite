@@ -62,6 +62,11 @@ public class SelectNamespace extends AbstractNamespace {
     return requireNonNull(rowType, "rowType");
   }
 
+  @Override public RelDataType validateImpl(RelDataType targetRowType, boolean ignoreImplicitName) {
+    validator.validateSelect(select, targetRowType, ignoreImplicitName);
+    return requireNonNull(rowType, "rowType");
+  }
+
   @Override public boolean supportsModality(SqlModality modality) {
     return validator.validateModality(select, modality, false);
   }
