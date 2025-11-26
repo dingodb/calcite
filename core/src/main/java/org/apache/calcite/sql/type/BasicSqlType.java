@@ -78,6 +78,13 @@ public class BasicSqlType extends AbstractSqlType {
     checkPrecScale(typeName, true, false);
   }
 
+  public BasicSqlType(RelDataTypeSystem typeSystem, SqlTypeName typeName,
+                      int precision, boolean nullable) {
+    this(typeSystem, typeName, nullable, precision, SCALE_NOT_SPECIFIED, null,
+            null);
+    checkPrecScale(typeName, true, false);
+  }
+
   /**
    * Constructs a type with precision/length and scale.
    *
@@ -89,6 +96,12 @@ public class BasicSqlType extends AbstractSqlType {
   public BasicSqlType(RelDataTypeSystem typeSystem, SqlTypeName typeName,
       int precision, int scale) {
     this(typeSystem, typeName, false, precision, scale, null, null);
+    checkPrecScale(typeName, true, true);
+  }
+
+  public BasicSqlType(RelDataTypeSystem typeSystem, SqlTypeName typeName,
+                      int precision, int scale, boolean nullable) {
+    this(typeSystem, typeName, nullable, precision, scale, null, null);
     checkPrecScale(typeName, true, true);
   }
 
