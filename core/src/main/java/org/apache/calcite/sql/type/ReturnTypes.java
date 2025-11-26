@@ -94,6 +94,14 @@ public abstract class ReturnTypes {
   }
 
   /**
+   * Creates an inference rule which returns a type with no precision or scale,
+   * such as {@code DATE}.
+   */
+  public static ExplicitReturnTypeInference explicit(SqlTypeName typeName, boolean nullable) {
+    return explicit(RelDataTypeImpl.proto(typeName, nullable));
+  }
+
+  /**
    * Creates an inference rule which returns a type with precision but no scale,
    * such as {@code VARCHAR(100)}.
    */
@@ -294,7 +302,7 @@ public abstract class ReturnTypes {
    * Type-inference strategy whereby the result type of a call is DATE.
    */
   public static final SqlReturnTypeInference DATE =
-      explicit(SqlTypeName.DATE);
+      explicit(SqlTypeName.DATE, true);
 
   /**
    * Type-inference strategy whereby the result type of a call is nullable

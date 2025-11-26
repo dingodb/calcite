@@ -55,6 +55,36 @@ public class SqlTypeFactoryImpl extends RelDataTypeFactoryImpl {
     return canonize(newType);
   }
 
+  @Override public RelDataType createSqlType(SqlTypeName typeName, boolean nullable) {
+    if (typeName.allowsPrec()) {
+      return createSqlType(typeName, typeSystem.getDefaultPrecision(typeName), nullable);
+    }
+    assertBasic(typeName);
+    RelDataType newType = new BasicSqlType(typeSystem, typeName, nullable);
+    return canonize(newType);
+  }
+
+  public RelDataType createSqlType(
+          SqlTypeName typeName,
+          int precision, boolean nullable) {
+    final int maxPrecision = typeSystem.getMaxPrecision(typeName);
+    if (maxPrecision >= 0 && precision > maxPrecision) {
+      precision = maxPrecision;
+    }
+    if (typeName.allowsScale()) {
+      return createSqlType(typeName, precision, typeName.getDefaultScale(), nullable);
+    }
+    assertBasic(typeName);
+    assert (precision >= 0)
+            || (precision == RelDataType.PRECISION_NOT_SPECIFIED);
+    // Does not check precision when typeName is SqlTypeName#NULL.
+    RelDataType newType = precision == RelDataType.PRECISION_NOT_SPECIFIED
+            ? new BasicSqlType(typeSystem, typeName, nullable)
+            : new BasicSqlType(typeSystem, typeName, precision, nullable);
+    newType = SqlTypeUtil.addCharsetAndCollation(newType, this);
+    return canonize(newType);
+  }
+
   @Override public RelDataType createSqlType(
       SqlTypeName typeName,
       int precision) {
@@ -89,6 +119,23 @@ public class SqlTypeFactoryImpl extends RelDataTypeFactoryImpl {
     }
     RelDataType newType =
         new BasicSqlType(typeSystem, typeName, precision, scale);
+    newType = SqlTypeUtil.addCharsetAndCollation(newType, this);
+    return canonize(newType);
+  }
+
+  @Override public RelDataType createSqlType(
+          SqlTypeName typeName,
+          int precision,
+          int scale, boolean nullable) {
+    assertBasic(typeName);
+    assert (precision >= 0)
+            || (precision == RelDataType.PRECISION_NOT_SPECIFIED);
+    final int maxPrecision = typeSystem.getMaxPrecision(typeName);
+    if (maxPrecision >= 0 && precision > maxPrecision) {
+      precision = maxPrecision;
+    }
+    RelDataType newType =
+            new BasicSqlType(typeSystem, typeName, precision, scale, nullable);
     newType = SqlTypeUtil.addCharsetAndCollation(newType, this);
     return canonize(newType);
   }

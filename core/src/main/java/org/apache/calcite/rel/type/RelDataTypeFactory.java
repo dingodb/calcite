@@ -220,6 +220,10 @@ public interface RelDataTypeFactory {
    */
   RelDataType createSqlType(SqlTypeName typeName);
 
+  default RelDataType createSqlType(SqlTypeName typeName, boolean nullable) {
+    return createSqlType(typeName);
+  }
+
   /**
    * Creates a SQL type that represents the "unknown" type.
    * It is only equal to itself, and is distinct from the NULL type.
@@ -261,6 +265,13 @@ public interface RelDataTypeFactory {
       SqlTypeName typeName,
       int precision,
       int scale);
+
+  default RelDataType createSqlType(
+          SqlTypeName typeName,
+          int precision,
+          int scale, boolean nullable) {
+    return createSqlType(typeName, precision, scale);
+  }
 
   /**
    * Creates a SQL interval type.
