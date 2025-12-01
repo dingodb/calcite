@@ -36,6 +36,7 @@ import org.apache.calcite.util.Glossary;
 import org.apache.calcite.util.Util;
 
 import com.google.common.base.Preconditions;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 import java.util.AbstractList;
 import java.util.List;
@@ -167,6 +168,27 @@ public abstract class ReturnTypes {
    */
   public static final SqlReturnTypeInference ARG0 =
       new OrdinalReturnTypeInference(0);
+
+  public static final SqlReturnTypeInference ROUND = new SqlReturnTypeInference() {
+    @Override
+    public @Nullable RelDataType inferReturnType(SqlOperatorBinding opBinding) {
+      RelDataTypeFactory typeFactory = opBinding.getTypeFactory();
+      RelDataType relDataType = opBinding.getOperandType(0);
+      if (relDataType.getSqlTypeName().allowsPrecScale(true, true)) {
+        try {
+          int scale = opBinding.getOperandLiteralValue(1, Integer.class);
+          if (scale > relDataType.getScale()) {
+            scale = relDataType.getScale();
+          }
+          return typeFactory.createSqlType(relDataType.getSqlTypeName(), relDataType.getPrecision(), scale, relDataType.isNullable());
+        } catch (Throwable e) {
+          return relDataType;
+        }
+      } else {
+        return relDataType;
+      }
+    }
+  };
 
   /**
    * Type-inference strategy whereby the result type of a call is VARYING the
