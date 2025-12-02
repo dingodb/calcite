@@ -619,6 +619,18 @@ public abstract class ReturnTypes {
     RelDataTypeFactory typeFactory = opBinding.getTypeFactory();
     RelDataType type1 = opBinding.getOperandType(0);
     RelDataType type2 = opBinding.getOperandType(1);
+
+    SqlOperator sqlOperator = opBinding.getOperator();
+    if (type1.getSqlTypeName() == SqlTypeName.INTEGER && type2.getSqlTypeName() == SqlTypeName.INTEGER) {
+        if (sqlOperator.getName().equalsIgnoreCase("*")) {
+            return typeFactory.createSqlType(SqlTypeName.BIGINT);
+        }
+    } else if (type1.getSqlTypeName() == SqlTypeName.FLOAT && type2.getSqlTypeName() == SqlTypeName.FLOAT) {
+        if (sqlOperator.getName().equalsIgnoreCase("*")) {
+            return typeFactory.createSqlType(SqlTypeName.DOUBLE);
+        }
+    }
+
     return typeFactory.getTypeSystem().deriveDecimalMultiplyType(typeFactory, type1, type2);
   };
 
@@ -650,6 +662,14 @@ public abstract class ReturnTypes {
     RelDataTypeFactory typeFactory = opBinding.getTypeFactory();
     RelDataType type1 = opBinding.getOperandType(0);
     RelDataType type2 = opBinding.getOperandType(1);
+
+    SqlOperator sqlOperator = opBinding.getOperator();
+    if(type1.getSqlTypeName() == SqlTypeName.FLOAT && type2.getSqlTypeName() == SqlTypeName.FLOAT) {
+        if (sqlOperator.getName().equalsIgnoreCase("/")) {
+            return typeFactory.createSqlType(SqlTypeName.DOUBLE);
+        }
+    }
+
     return typeFactory.getTypeSystem().deriveDecimalDivideType(typeFactory, type1, type2);
   };
 
@@ -680,6 +700,20 @@ public abstract class ReturnTypes {
     RelDataTypeFactory typeFactory = opBinding.getTypeFactory();
     RelDataType type1 = opBinding.getOperandType(0);
     RelDataType type2 = opBinding.getOperandType(1);
+
+    SqlOperator sqlOperator = opBinding.getOperator();
+    if (type1.getSqlTypeName() == SqlTypeName.INTEGER && type2.getSqlTypeName() == SqlTypeName.INTEGER) {
+        if (sqlOperator.getName().equalsIgnoreCase("+") ||
+            sqlOperator.getName().equalsIgnoreCase("-")) {
+            return typeFactory.createSqlType(SqlTypeName.BIGINT);
+        }
+    } else if(type1.getSqlTypeName() == SqlTypeName.FLOAT && type2.getSqlTypeName() == SqlTypeName.FLOAT) {
+        if (sqlOperator.getName().equalsIgnoreCase("+") ||
+            sqlOperator.getName().equalsIgnoreCase("-")) {
+            return typeFactory.createSqlType(SqlTypeName.DOUBLE);
+        }
+    }
+
     return typeFactory.getTypeSystem().deriveDecimalPlusType(typeFactory, type1, type2);
   };
 

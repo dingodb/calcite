@@ -79,7 +79,7 @@ public class FixtureTest {
             + " type '<INTEGER> \\+ <DATE>'.*");
 
     f.withSql("select 1 + 2 as three")
-        .type("RecordType(INTEGER NOT NULL THREE) NOT NULL");
+        .type("RecordType(BIGINT NOT NULL THREE) NOT NULL");
   }
 
   /** Tests that you can run operator tests via
@@ -99,19 +99,19 @@ public class FixtureTest {
         "<false>", "<true>");
 
     // The fixture that executes fails, because the result value is incorrect.
-    validateFixture.checkScalarExact("1 + 2", "INTEGER NOT NULL", "foo");
+    validateFixture.checkScalarExact("1 + 2", "BIGINT NOT NULL", "foo");
     assertFails(() -> validateFixture.checkScalarExact("1 + 2", "DATE", "foo"),
-        "\"DATE\"", "\"INTEGER NOT NULL\"");
+        "\"DATE\"", "\"BIGINT NOT NULL\"");
 
     // Both fixtures pass.
-    validateFixture.checkScalarExact("1 + 2", "INTEGER NOT NULL", "3");
-    executeFixture.checkScalarExact("1 + 2", "INTEGER NOT NULL", "3");
+    validateFixture.checkScalarExact("1 + 2", "BIGINT NOT NULL", "3");
+    executeFixture.checkScalarExact("1 + 2", "BIGINT NOT NULL", "3");
 
     // Both fixtures fail, because the type is incorrect.
     assertFails(() -> validateFixture.checkScalarExact("1 + 2", "DATE", "foo"),
-        "\"DATE\"", "\"INTEGER NOT NULL\"");
+        "\"DATE\"", "\"BIGINT NOT NULL\"");
     assertFails(() -> executeFixture.checkScalarExact("1 + 2", "DATE", "foo"),
-        "\"DATE\"", "\"INTEGER NOT NULL\"");
+        "\"DATE\"", "\"BIGINT NOT NULL\"");
   }
 
   static void assertFails(Runnable runnable, String expected, String actual) {
