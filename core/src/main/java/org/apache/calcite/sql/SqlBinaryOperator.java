@@ -21,6 +21,7 @@ import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.SqlOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlOperandTypeInference;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.calcite.sql.validate.SqlMonotonicity;
 import org.apache.calcite.sql.validate.SqlValidator;
@@ -163,7 +164,19 @@ public class SqlBinaryOperator extends SqlOperator {
                     type.getCharset(),
                     requireNonNull(resultCol, "resultCol"));
       }
-    }
+    } else if (operandType0.getSqlTypeName() == SqlTypeName.INTEGER &&
+        operandType1.getSqlTypeName() == SqlTypeName.INTEGER ) {
+        if (call.getOperator().getName() == "+" || call.getOperator().getName() == "-" ||
+           call.getOperator().getName() == "*") {
+            type = validator.getTypeFactory().createSqlType(SqlTypeName.BIGINT);
+        }
+    } else if (operandType0.getSqlTypeName() == SqlTypeName.FLOAT &&
+        operandType1.getSqlTypeName() == SqlTypeName.FLOAT) {
+          if (call.getOperator().getName() == "+" || call.getOperator().getName() == "-" ||
+              call.getOperator().getName() == "*" || call.getOperator().getName() == "/") {
+              type = validator.getTypeFactory().createSqlType(SqlTypeName.DOUBLE);
+          }
+      }
     return type;
   }
 
