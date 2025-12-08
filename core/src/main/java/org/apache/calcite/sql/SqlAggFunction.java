@@ -16,16 +16,24 @@
  */
 package org.apache.calcite.sql;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.calcite.linq4j.function.Experimental;
 import org.apache.calcite.plan.Context;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.sql.fun.SqlAvgAggFunction;
 import org.apache.calcite.sql.fun.SqlBasicAggFunction;
+import org.apache.calcite.sql.fun.SqlCastFunction;
+import org.apache.calcite.sql.fun.SqlSumAggFunction;
+import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.type.SqlOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlOperandTypeInference;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
+import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql.validate.SqlValidatorScope;
+import org.apache.calcite.sql.validate.implicit.TypeCoercion;
 import org.apache.calcite.util.Optionality;
 
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -171,6 +179,104 @@ public abstract class SqlAggFunction extends SqlFunction implements Context {
   @Override public final boolean requiresOver() {
     return requiresOver;
   }
+
+    @Override
+    protected List<RelDataType> constructArgTypeList(
+        SqlValidator validator,
+        SqlValidatorScope scope,
+        SqlCall call,
+        List<SqlNode> args,
+        boolean convertRowArgToColumnList) {
+        // Scope for operands. Usually the same as 'scope'.
+        final SqlValidatorScope operandScope = scope.getOperandScope(call);
+
+        final ImmutableList.Builder<RelDataType> argTypeBuilder =
+            ImmutableList.builder();
+        for (SqlNode operand : args) {
+            RelDataType nodeType;
+            // for row arguments that should be converted to ColumnList
+            // types, set the nodeType to a ColumnList type but defer
+            // validating the arguments of the row constructor until we know
+            // for sure that the row argument maps to a ColumnList type
+            if (operand.getKind() == SqlKind.ROW && convertRowArgToColumnList) {
+                RelDataTypeFactory typeFactory = validator.getTypeFactory();
+                nodeType = typeFactory.createSqlType(SqlTypeName.COLUMN_LIST);
+                validator.setValidatedNodeType(operand, nodeType);
+                argTypeBuilder.add(nodeType);
+            } else {
+                nodeType = validator.deriveType(operandScope, operand);
+
+                if(getClass() == SqlSumAggFunction.class) {
+                    RelDataTypeFactory typeFactory = validator.getTypeFactory();
+                    TypeCoercion typeCoercion = validator.getTypeCoercion();
+                    SqlFunction castFunction = new SqlCastFunction();
+                    SqlTypeName typeName = nodeType.getSqlTypeName();
+
+                    if(typeName == SqlTypeName.TINYINT || typeName == SqlTypeName.INTEGER
+                        || typeName == SqlTypeName.BIGINT || typeName == SqlTypeName.DECIMAL) {
+                        int precision = 0;
+                        int scale = 0;
+                        boolean nullable = nodeType.isNullable();
+
+                        if (nodeType.getSqlTypeName() == SqlTypeName.TINYINT) {
+                            precision = 25;
+                        } else if(nodeType.getSqlTypeName() == SqlTypeName.INTEGER) {
+                            precision = 32;
+                        } else if(nodeType.getSqlTypeName() == SqlTypeName.BIGINT) {
+                            precision = 41;
+                        } else if(nodeType.getSqlTypeName() == SqlTypeName.DECIMAL) {
+                            precision = nodeType.getPrecision() + 22;
+                            precision = precision > 65 ? 65 : precision;
+                            scale = nodeType.getScale();
+                        }
+
+                        RelDataType targetType = typeFactory.createSqlType(SqlTypeName.DECIMAL,precision,scale,nullable);
+                        SqlNode sqlNode = castFunction.createCall(SqlParserPos.ZERO, operand,
+                            SqlTypeUtil.convertTypeToSpec(targetType).withNullable(targetType.isNullable()));
+                        call.setOperand(0, sqlNode);
+                        argTypeBuilder.add(targetType);
+                    } else {
+                        argTypeBuilder.add(nodeType);
+                    }
+                } else if(getClass() == SqlAvgAggFunction.class) {
+                    RelDataTypeFactory typeFactory = validator.getTypeFactory();
+                    TypeCoercion typeCoercion = validator.getTypeCoercion();
+                    SqlFunction castFunction = new SqlCastFunction();
+                    SqlTypeName typeName = nodeType.getSqlTypeName();
+
+                    if(typeName == SqlTypeName.TINYINT || typeName == SqlTypeName.INTEGER
+                        || typeName == SqlTypeName.BIGINT || typeName == SqlTypeName.DECIMAL) {
+                        int precision = 0;
+                        int scale = 0;
+                        boolean nullable = nodeType.isNullable();
+
+                        if (nodeType.getSqlTypeName() == SqlTypeName.TINYINT) {
+                            precision = 7;
+                        } else if(nodeType.getSqlTypeName() == SqlTypeName.INTEGER) {
+                            precision = 14;
+                        } else if(nodeType.getSqlTypeName() == SqlTypeName.BIGINT) {
+                            precision = 23;
+                        } else if(nodeType.getSqlTypeName() == SqlTypeName.DECIMAL) {
+                            precision = nodeType.getPrecision() + 4;
+                            scale = nodeType.getScale() + 4;
+                        }
+
+                        RelDataType targetType = typeFactory.createSqlType(SqlTypeName.DECIMAL,precision,scale,nullable);
+                        SqlNode sqlNode = castFunction.createCall(SqlParserPos.ZERO, operand,
+                            SqlTypeUtil.convertTypeToSpec(targetType).withNullable(targetType.isNullable()));
+                        call.setOperand(0, sqlNode);
+                        argTypeBuilder.add(targetType);
+                    } else {
+                        argTypeBuilder.add(nodeType);
+                    }
+                } else {
+                    argTypeBuilder.add(nodeType);
+                }
+            }
+        }
+
+        return argTypeBuilder.build();
+    }
 
   /** Returns whether this aggregate function allows the {@code DISTINCT}
    * keyword.

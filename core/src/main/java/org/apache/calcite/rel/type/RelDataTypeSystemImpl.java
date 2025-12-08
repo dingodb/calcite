@@ -222,11 +222,6 @@ public abstract class RelDataTypeSystemImpl implements RelDataTypeSystem {
       RelDataType argumentType) {
     if (argumentType instanceof BasicSqlType) {
       SqlTypeName typeName = argumentType.getSqlTypeName();
-      if (typeName == SqlTypeName.DECIMAL) {
-        return typeFactory.createSqlType(typeName, argumentType.getPrecision() + 22, argumentType.getScale(), true);
-      } else if (typeName == SqlTypeName.TINYINT || typeName == SqlTypeName.SMALLINT) {
-        return typeFactory.createSqlType(SqlTypeName.INTEGER);
-      }
       if (typeName.allowsPrec()
           && argumentType.getPrecision() != RelDataType.PRECISION_NOT_SPECIFIED) {
         int precision = typeFactory.getTypeSystem().getMaxPrecision(typeName);
@@ -244,22 +239,13 @@ public abstract class RelDataTypeSystemImpl implements RelDataTypeSystem {
   }
 
   @Override public RelDataType deriveAvgAggType(RelDataTypeFactory typeFactory,
-      RelDataType argumentType) {
-    if(argumentType.getSqlTypeName() == SqlTypeName.INTEGER) {
-      return typeFactory.createSqlType(SqlTypeName.DECIMAL, 14, 4, true);
-    } else if (argumentType.getSqlTypeName() == SqlTypeName.TINYINT) {
-      return typeFactory.createSqlType(SqlTypeName.DECIMAL, 7, 4, true);
-    } else if (argumentType.getSqlTypeName() == SqlTypeName.SMALLINT) {
-      return typeFactory.createSqlType(SqlTypeName.DECIMAL, 9, 4, true);
-    } else if (argumentType.getSqlTypeName() == SqlTypeName.BIGINT) {
-      return typeFactory.createSqlType(SqlTypeName.DECIMAL, 23, 4, true);
-    } else if (argumentType.getSqlTypeName() == SqlTypeName.FLOAT) {
-      return typeFactory.createSqlType(SqlTypeName.DOUBLE, true);
-    } else if (argumentType.getSqlTypeName() == SqlTypeName.DECIMAL) {
-      return typeFactory.createSqlType(SqlTypeName.DECIMAL, argumentType.getPrecision() + 4, argumentType.getScale() + 4, true);
-    } else {
-      return typeFactory.createTypeWithNullability(argumentType, true);
+        RelDataType argumentType) {
+    if(argumentType.getSqlTypeName() == SqlTypeName.TINYINT ||
+        argumentType.getSqlTypeName() == SqlTypeName.INTEGER ||
+        argumentType.getSqlTypeName() == SqlTypeName.BIGINT) {
+        return typeFactory.createSqlType(SqlTypeName.DECIMAL, 14, 4);
     }
+    return argumentType;
   }
 
   @Override public RelDataType deriveCovarType(RelDataTypeFactory typeFactory,
