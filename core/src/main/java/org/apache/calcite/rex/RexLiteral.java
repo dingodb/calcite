@@ -729,6 +729,11 @@ public class RexLiteral extends RexNode {
       final String wkt = SpatialTypeFunctions.ST_AsWKT((Geometry) castNonNull(value));
       sb.append(wkt);
       break;
+    case BIT:
+      if (value instanceof ByteString) {
+        sb.append(".");
+      }
+      break;
     default:
       assert valueMatchesType(value, typeName, true);
       throw Util.needToImplement(typeName);

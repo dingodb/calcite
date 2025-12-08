@@ -64,6 +64,7 @@ import org.locationtech.jts.geom.Geometry;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
+import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -1515,6 +1516,8 @@ public class RexBuilder {
     case REAL:
     case DOUBLE:
       return BigDecimal.ZERO;
+    case BIT:
+      return 0L;
     case BOOLEAN:
       return false;
     case TIME:
@@ -1714,6 +1717,14 @@ public class RexBuilder {
           SqlTypeName.GEOMETRY);
     case ANY:
       return makeLiteral(value, guessType(value), allowCast);
+    case BIT:
+      if (value instanceof Long) {
+        ByteBuffer buffer = ByteBuffer.allocate(8);
+        buffer.putLong((Long) value);
+        return new RexLiteral(new ByteString(buffer.array()), type, sqlTypeName);
+      } else if (value instanceof ByteString) {
+        return new RexLiteral((Comparable) value, type, sqlTypeName);
+      }
     default:
       throw new IllegalArgumentException(
           "Cannot create literal for type '" + sqlTypeName + "'");
