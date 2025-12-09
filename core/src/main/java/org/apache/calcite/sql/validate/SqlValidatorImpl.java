@@ -168,6 +168,8 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
   public static final String UPDATE_ANON_PREFIX = "SYS$ANON";
   public static final String IMPLICIT_COL_NAME = "_DINGO_IMPLICIT_ROWID_";
 
+  public static final String GENERATE_SERIES = "GENERATE_SERIES";
+
   //~ Instance fields --------------------------------------------------------
 
   private final SqlOperatorTable opTab;
@@ -2719,6 +2721,11 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
       scopes.put(node, usingScope);
       return newNode;
 
+    case LITERAL:
+      SqlLiteral literal = (SqlLiteral) node;
+      if (literal.getValue() == null && enclosingNode.toString().contains(GENERATE_SERIES)) {
+        throw new IllegalArgumentException("Parameter cannot be null");
+      }
     default:
       throw Util.unexpected(kind);
     }
