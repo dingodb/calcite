@@ -235,6 +235,13 @@ public abstract class SqlAggFunction extends SqlFunction implements Context {
                             SqlTypeUtil.convertTypeToSpec(targetType).withNullable(targetType.isNullable()));
                         call.setOperand(0, sqlNode);
                         argTypeBuilder.add(targetType);
+                    } else if (typeName == SqlTypeName.FLOAT ) {
+                        RelDataType targetType = typeFactory.createSqlType(SqlTypeName.DOUBLE);
+
+                        SqlNode sqlNode = castFunction.createCall(SqlParserPos.ZERO, operand,
+                                SqlTypeUtil.convertTypeToSpec(targetType).withNullable(targetType.isNullable()));
+                        call.setOperand(0, sqlNode);
+                        argTypeBuilder.add(targetType);
                     } else {
                         argTypeBuilder.add(nodeType);
                     }
@@ -264,6 +271,13 @@ public abstract class SqlAggFunction extends SqlFunction implements Context {
                         RelDataType targetType = typeFactory.createSqlType(SqlTypeName.DECIMAL,precision,scale,nullable);
                         SqlNode sqlNode = castFunction.createCall(SqlParserPos.ZERO, operand,
                             SqlTypeUtil.convertTypeToSpec(targetType).withNullable(targetType.isNullable()));
+                        call.setOperand(0, sqlNode);
+                        argTypeBuilder.add(targetType);
+                    } else if (typeName == SqlTypeName.FLOAT ) {
+                        RelDataType targetType = typeFactory.createSqlType(SqlTypeName.DOUBLE);
+
+                        SqlNode sqlNode = castFunction.createCall(SqlParserPos.ZERO, operand,
+                                SqlTypeUtil.convertTypeToSpec(targetType).withNullable(targetType.isNullable()));
                         call.setOperand(0, sqlNode);
                         argTypeBuilder.add(targetType);
                     } else {

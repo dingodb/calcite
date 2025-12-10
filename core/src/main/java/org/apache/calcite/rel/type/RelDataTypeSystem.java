@@ -178,6 +178,8 @@ public interface RelDataTypeSystem {
                 SqlTypeName.DECIMAL,
                 precision,
                 scale);
+      } else if(SqlTypeUtil.isInt(type1) && SqlTypeUtil.isInt(type2)) {
+          return typeFactory.createSqlType(SqlTypeName.BIGINT);
       }
     }
     return null;
