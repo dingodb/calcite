@@ -16,6 +16,7 @@ on:
       branches:
         - develop
         - main
+        - quickBI-v3.0.0
       pull_requests:
         - merged
 jobs:
