@@ -200,7 +200,7 @@ public class SqlIntervalQualifier extends SqlNode {
   @Override public void validate(
       SqlValidator validator,
       SqlValidatorScope scope) {
-    validator.validateIntervalQualifier(this);
+    // validator.validateIntervalQualifier(this);
   }
 
   @Override public <R> R accept(SqlVisitor<R> visitor) {

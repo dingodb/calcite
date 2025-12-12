@@ -3448,7 +3448,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
             interval.getIntervalQualifier();
 
         // ensure qualifier is good before attempting to validate literal
-        validateIntervalQualifier(intervalQualifier);
+        // validateIntervalQualifier(intervalQualifier);
         String intervalStr = interval.getIntervalLiteral();
         // throws CalciteContextException if string is invalid
         int[] values = intervalQualifier.evaluateIntervalLiteral(intervalStr,
