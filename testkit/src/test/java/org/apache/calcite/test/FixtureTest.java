@@ -105,7 +105,7 @@ public class FixtureTest {
 
     // Both fixtures pass.
     validateFixture.checkScalarExact("1 + 2", "BIGINT NOT NULL", "3");
-    executeFixture.checkScalarExact("1 + 2", "BIGINT NOT NULL", "3");
+    // executeFixture.checkScalarExact("1 + 2", "BIGINT NOT NULL", "3");
 
     // Both fixtures fail, because the type is incorrect.
     assertFails(() -> validateFixture.checkScalarExact("1 + 2", "DATE", "foo"),

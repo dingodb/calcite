@@ -839,7 +839,8 @@ public abstract class OperandTypes {
       NUMERIC_NUMERIC
           .or(INTERVAL_SAME_SAME)
           .or(DATETIME_INTERVAL)
-          .or(INTERVAL_DATETIME);
+          .or(INTERVAL_DATETIME)
+          .or(NUMERIC_INTERVAL);
 
   /**
    * Type-checking strategy for the "*" operator.
