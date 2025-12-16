@@ -797,6 +797,12 @@ public abstract class OperandTypes {
   public static final SqlSingleOperandTypeChecker NUMERIC_INTERVAL =
       family(SqlTypeFamily.NUMERIC, SqlTypeFamily.DATETIME_INTERVAL);
 
+  public static final SqlSingleOperandTypeChecker BOOLEAN_INTERVAL =
+      family(SqlTypeFamily.BOOLEAN, SqlTypeFamily.DATETIME_INTERVAL);
+
+  public static final SqlSingleOperandTypeChecker STRING_INTERVAL =
+      family(SqlTypeFamily.STRING, SqlTypeFamily.DATETIME_INTERVAL);
+
   public static final SqlSingleOperandTypeChecker INTERVAL_NUMERIC =
       family(SqlTypeFamily.DATETIME_INTERVAL, SqlTypeFamily.NUMERIC);
 
@@ -839,8 +845,7 @@ public abstract class OperandTypes {
       NUMERIC_NUMERIC
           .or(INTERVAL_SAME_SAME)
           .or(DATETIME_INTERVAL)
-          .or(INTERVAL_DATETIME)
-          .or(NUMERIC_INTERVAL);
+          .or(INTERVAL_DATETIME);
 
   /**
    * Type-checking strategy for the "*" operator.
@@ -848,7 +853,8 @@ public abstract class OperandTypes {
   public static final SqlSingleOperandTypeChecker MULTIPLY_OPERATOR =
       NUMERIC_NUMERIC
           .or(INTERVAL_NUMERIC)
-          .or(NUMERIC_INTERVAL);
+          .or(NUMERIC_INTERVAL)
+          .or(DATETIME_INTERVAL);
 
   /**
    * Type-checking strategy for the "/" operator.

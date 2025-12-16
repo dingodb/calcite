@@ -394,7 +394,7 @@ public class StandardConvertletTable extends ReflectiveConvertletTable {
         SqlLiteral.createInterval(1, "1", intervalQualifier,
             call.getParserPosition());
     final SqlCall multiply =
-        SqlStdOperatorTable.PLUS.createCall(call.getParserPosition(), n,
+        SqlStdOperatorTable.MULTIPLY.createCall(call.getParserPosition(), n,
             literal);
     return cx.convertExpression(multiply);
   }
@@ -1080,13 +1080,6 @@ public class StandardConvertletTable extends ReflectiveConvertletTable {
     case DATE:
     case TIME:
     case TIMESTAMP:
-    case DOUBLE:
-    case FLOAT:
-    case DECIMAL:
-    case BIT:
-    case BIGINT:
-    case INTEGER:
-    case BOOLEAN:
       // Use special "+" operator for datetime + interval.
       // Re-order operands, if necessary, so that interval is second.
       final RexBuilder rexBuilder = cx.getRexBuilder();
