@@ -52,7 +52,10 @@ public class SqlIntervalOperator extends SqlInternalOperator {
 
   SqlIntervalOperator() {
     super("INTERVAL", SqlKind.INTERVAL, 0, true, RETURN_TYPE,
-        InferTypes.ANY_NULLABLE, OperandTypes.NUMERIC_INTERVAL);
+        InferTypes.ANY_NULLABLE, OperandTypes.NUMERIC_INTERVAL
+                    .or(OperandTypes.DATETIME_INTERVAL)
+                    .or(OperandTypes.BOOLEAN_INTERVAL)
+                    .or(OperandTypes.STRING_INTERVAL));
   }
 
   private static RelDataType returnType(SqlOperatorBinding opBinding) {
