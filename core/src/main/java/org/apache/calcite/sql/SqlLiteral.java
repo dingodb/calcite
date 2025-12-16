@@ -745,8 +745,12 @@ public class SqlLiteral extends SqlNode {
       int rightPrec) {
     switch (typeName) {
     case BOOLEAN:
-      writer.keyword(
-          value == null ? "UNKNOWN" : (Boolean) value ? "TRUE" : "FALSE");
+        if (StringUtils.isNotEmpty(getAliasName()) && isFullAlias()) {
+            writer.keyword(getAliasName());
+        } else {
+            writer.keyword(
+              value == null ? "UNKNOWN" : (Boolean) value ? "TRUE" : "FALSE");
+        }
       break;
     case NULL:
       if (StringUtils.isNotEmpty(getAliasName()) && isFullAlias()) {
