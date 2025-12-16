@@ -41,7 +41,7 @@ public class SqlNumericLiteral extends SqlLiteral {
 
   //~ Constructors -----------------------------------------------------------
 
-  protected SqlNumericLiteral(
+  public SqlNumericLiteral(
       BigDecimal value,
       @Nullable Integer prec,
       @Nullable Integer scale,
