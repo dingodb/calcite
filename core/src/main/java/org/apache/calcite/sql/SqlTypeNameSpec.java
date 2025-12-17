@@ -20,6 +20,9 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.util.Litmus;
+import org.apache.commons.lang.StringUtils;
+
+import java.util.Properties;
 
 /**
  * A <code>SqlTypeNameSpec</code> is a type name specification that allows user to
@@ -32,6 +35,7 @@ import org.apache.calcite.util.Litmus;
  * {@link #deriveType(SqlValidator)}.
  */
 public abstract class SqlTypeNameSpec {
+  private Properties aliasProp;
   private final SqlIdentifier typeName;
   private final SqlParserPos pos;
 
@@ -67,5 +71,41 @@ public abstract class SqlTypeNameSpec {
 
   public SqlIdentifier getTypeName() {
     return typeName;
+  }
+
+  public void putAlias(String key, String val) {
+    if (StringUtils.isEmpty(val) || StringUtils.isEmpty(key)) {
+      return;
+    }
+    if (aliasProp == null) {
+      this.aliasProp = new Properties();
+      this.aliasProp.put(key, val);
+    } else {
+      this.aliasProp.put(key, val);
+    }
+  }
+
+  public boolean isFullAlias() {
+    if (aliasProp != null) {
+      Object aliasName = aliasProp.get("fullAlias");
+      if (aliasName != null) {
+        try {
+          return Boolean.parseBoolean(aliasName.toString());
+        } catch (Exception e) {
+          return false;
+        }
+      }
+    }
+    return false;
+  }
+
+  public String getAliasName() {
+    if (aliasProp != null) {
+      Object aliasName = aliasProp.get("aliasName");
+      if (aliasName instanceof String) {
+        return aliasName.toString();
+      }
+    }
+    return null;
   }
 }

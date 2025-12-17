@@ -162,6 +162,10 @@ public class SqlBasicTypeNameSpec extends SqlTypeNameSpec {
     // instead of direct unparsing with enum name.
     // i.e. TIME_WITH_LOCAL_TIME_ZONE(3)
     // would be unparsed as "time(3) with local time zone".
+    if (getAliasName() != null && isFullAlias()) {
+      writer.keyword(getAliasName());
+      return;
+    }
     final boolean isWithLocalTimeZone = isWithLocalTimeZoneDef(sqlTypeName);
     if (isWithLocalTimeZone) {
       writer.keyword(stripLocalTimeZoneDef(sqlTypeName).name());
