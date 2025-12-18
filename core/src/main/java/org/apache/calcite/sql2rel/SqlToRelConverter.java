@@ -5035,7 +5035,10 @@ public class SqlToRelConverter {
                                                 List<Integer> outExtraTargetTableIndexes,
                                                 List<String> outExtraTargetColumns) {
     // TODO
-    return update.getSourceSelect();
+    SqlSelect sourceSelect = update.getSourceSelect();
+    SqlNodeList sourceExpression = this.validator().expandStar(update.getSourceExpressionList(), sourceSelect, false);
+    update.setOperand(2, sourceExpression);
+    return sourceSelect;
   }
 
   private List<TableModify.TableInfoNode> buildUpdateSourceInfo(SqlUpdate call, Map<String, Integer> outAliasTableMap,
