@@ -4232,20 +4232,31 @@ public class SqlToRelConverter {
         LogicalTableModify.Operation.DELETE, null, null, false);
   }
 
-  protected void checkSubqueryInSetClause(SqlUpdate call) {
+  protected void checkSubQueryInSetClause(SqlUpdate call) {
     if (call.getSourceExpressionList() != null) {
       for (SqlNode node : call.getSourceExpressionList()) {
-        if (node instanceof SqlSelect) { // Don't allow sub-query in update set clause.
-          final CalciteContextException ex =
-                  validator.newValidationError(node, RESOURCE.updateNotSupport(node.toString()));
-          throw new RuntimeException(ex.getMessage(), ex);
-        }
+        checkForSubQuery(node);
+      }
+    }
+  }
+
+  private void checkForSubQuery(SqlNode node) {
+
+    if (node instanceof SqlSelect) {
+      final CalciteContextException ex =
+              validator.newValidationError(node, RESOURCE.updateNotSupport(node.toString()));
+      throw new RuntimeException(ex.getMessage(), ex);
+    }
+
+    if (node instanceof SqlCall) {
+      for (SqlNode operand : ((SqlCall) node).getOperandList()) {
+        checkForSubQuery(operand);
       }
     }
   }
 
   private RelNode convertUpdate(SqlUpdate call) {
-    checkSubqueryInSetClause(call);
+    checkSubQueryInSetClause(call);
 
     // Source table info
     // Map column to table it belongs to
