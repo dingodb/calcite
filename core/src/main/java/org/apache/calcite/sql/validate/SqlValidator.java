@@ -360,6 +360,13 @@ public interface SqlValidator {
       SqlValidatorScope scope,
       SqlNode operand);
 
+  default RelDataType deriveType(
+          SqlValidatorScope scope,
+          SqlNode operand,
+          SqlCall call) {
+    return null;
+  }
+
   /**
    * Adds "line x, column y" context to a validator exception.
    *

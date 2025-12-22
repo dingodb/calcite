@@ -64,6 +64,7 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlMatchRecognize;
 import org.apache.calcite.sql.SqlMerge;
+import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.SqlOperator;
@@ -1943,6 +1944,34 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
     Preconditions.checkArgument(
         type != null,
         "SqlValidator.deriveTypeInternal returned null");
+    setValidatedNodeType(expr, type);
+    return type;
+  }
+
+  @Override
+  public RelDataType deriveType(SqlValidatorScope scope, SqlNode expr, SqlCall call) {
+    requireNonNull(scope, "scope");
+    requireNonNull(expr, "expr");
+
+    // if we already know the type, no need to re-derive
+    RelDataType type = nodeToTypeMap.get(expr);
+    if (type != null) {
+      return type;
+    }
+    final SqlValidatorNamespace ns = getNamespace(expr);
+    if (ns != null) {
+      return ns.getType();
+    }
+    if (call.getOperator().getName().equalsIgnoreCase("ABS") && expr instanceof SqlNumericLiteral) {
+      long value = ((BigDecimal) ((SqlNumericLiteral) expr).getValue()).longValue();
+      if (value == Integer.MIN_VALUE) {
+        type = typeFactory.createSqlType(SqlTypeName.BIGINT);
+      }
+    }
+    if (type == null) {
+      type = deriveTypeImpl(scope, expr);
+    }
+    Preconditions.checkArgument(type != null, "SqlValidator.deriveTypeInternal returned null");
     setValidatedNodeType(expr, type);
     return type;
   }
