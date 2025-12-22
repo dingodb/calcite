@@ -691,7 +691,11 @@ public abstract class SqlOperator {
         nodeType = typeFactory.createSqlType(SqlTypeName.COLUMN_LIST);
         validator.setValidatedNodeType(operand, nodeType);
       } else {
-        nodeType = validator.deriveType(operandScope, operand);
+        if (call.getOperator().getName().equalsIgnoreCase("ABS")) {
+          nodeType = validator.deriveType(operandScope, operand, call);
+        } else {
+          nodeType = validator.deriveType(operandScope, operand);
+        }
       }
       argTypeBuilder.add(nodeType);
     }
