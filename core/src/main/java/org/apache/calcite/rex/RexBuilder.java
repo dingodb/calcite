@@ -610,6 +610,34 @@ public class RexBuilder {
         default:
           break;
         }
+
+        if (type.getSqlTypeName() == SqlTypeName.DECIMAL) {
+            if (literal.getType().getSqlTypeName() == SqlTypeName.INTEGER
+                || literal.getType().getSqlTypeName() == SqlTypeName.BIGINT
+                || literal.getType().getSqlTypeName() == SqlTypeName.VARCHAR
+                || literal.getType().getSqlTypeName() == SqlTypeName.CHAR) {
+                BigDecimal v = (BigDecimal) literal.getValue();
+                if(v != null) {
+                    BigDecimal v1 = v.setScale(type.getScale(), RoundingMode.HALF_UP);
+
+                    RelDataType t = typeFactory.createSqlType(type.getSqlTypeName(), type.getPrecision(), type.getScale());
+                    final RexLiteral newExp = makeLiteral(v1, t, type.getSqlTypeName());
+                    return makeAbstractCast(type, newExp);
+                }
+            } else if(literal.getType().getSqlTypeName() == SqlTypeName.DECIMAL) {
+                BigDecimal v = (BigDecimal) literal.getValue();
+                if(v != null) {
+                    BigDecimal v1 = v.setScale(type.getScale(), RoundingMode.HALF_UP);
+
+                    int precision = type.getPrecision() >= literal.getType().getPrecision()
+                            ? type.getPrecision() : literal.getType().getPrecision();
+                    RelDataType t = typeFactory.createSqlType(type.getSqlTypeName(), precision, type.getScale());
+                    final RexLiteral newExp = makeLiteral(v1, t, type.getSqlTypeName());
+                    return makeAbstractCast(type, newExp);
+                }
+            }
+        }
+
         final RexLiteral literal2 =
             makeLiteral(value, type, typeName);
         if (type.isNullable()
