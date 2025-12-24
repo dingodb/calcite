@@ -621,7 +621,8 @@ public abstract class ReturnTypes {
     RelDataType type2 = opBinding.getOperandType(1);
 
     SqlOperator sqlOperator = opBinding.getOperator();
-    if (type1.getSqlTypeName() == SqlTypeName.INTEGER && type2.getSqlTypeName() == SqlTypeName.INTEGER) {
+    if ((type1.getSqlTypeName() == SqlTypeName.INTEGER && type2.getSqlTypeName() == SqlTypeName.INTEGER)
+        || (type1.getSqlTypeName() == SqlTypeName.TINYINT && type2.getSqlTypeName() == SqlTypeName.TINYINT)) {
         if (sqlOperator.getName().equalsIgnoreCase("*")) {
             return typeFactory.createSqlType(SqlTypeName.BIGINT);
         }
@@ -702,7 +703,8 @@ public abstract class ReturnTypes {
     RelDataType type2 = opBinding.getOperandType(1);
 
     SqlOperator sqlOperator = opBinding.getOperator();
-    if (type1.getSqlTypeName() == SqlTypeName.INTEGER && type2.getSqlTypeName() == SqlTypeName.INTEGER) {
+    if ((type1.getSqlTypeName() == SqlTypeName.INTEGER && type2.getSqlTypeName() == SqlTypeName.INTEGER)
+        || (type1.getSqlTypeName() == SqlTypeName.TINYINT && type2.getSqlTypeName() == SqlTypeName.TINYINT)) {
         if (sqlOperator.getName().equalsIgnoreCase("+") ||
             sqlOperator.getName().equalsIgnoreCase("-")) {
             return typeFactory.createSqlType(SqlTypeName.BIGINT);
