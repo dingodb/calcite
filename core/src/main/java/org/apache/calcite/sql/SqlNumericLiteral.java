@@ -39,6 +39,9 @@ public class SqlNumericLiteral extends SqlLiteral {
   private @Nullable Integer scale;
   private boolean isExact;
 
+  private static final BigDecimal longMinValue = new BigDecimal(Long.MIN_VALUE);
+  private static final BigDecimal longMaxValue = new BigDecimal(Long.MAX_VALUE);
+
   //~ Constructors -----------------------------------------------------------
 
   public SqlNumericLiteral(
@@ -104,8 +107,11 @@ public class SqlNumericLiteral extends SqlLiteral {
         long l = bd.longValue();
         if ((l >= Integer.MIN_VALUE) && (l <= Integer.MAX_VALUE)) {
           result = SqlTypeName.INTEGER;
-        } else {
+        } else if (bd.compareTo(longMinValue) >= 0 && bd.compareTo(longMaxValue) <= 0) {
           result = SqlTypeName.BIGINT;
+        } else {
+          result = SqlTypeName.DECIMAL;
+          return typeFactory.createSqlType(result, bd.precision(), bd.scale());
         }
         return typeFactory.createSqlType(result);
       }
