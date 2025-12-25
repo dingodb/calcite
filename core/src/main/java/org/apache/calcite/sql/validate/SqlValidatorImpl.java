@@ -3480,7 +3480,7 @@ public class SqlValidatorImpl implements SqlValidatorWithHints {
         // validateIntervalQualifier(intervalQualifier);
         String intervalStr = interval.getIntervalLiteral();
         // throws CalciteContextException if string is invalid
-        int[] values = intervalQualifier.evaluateIntervalLiteral(intervalStr,
+        long[] values = intervalQualifier.evaluateIntervalLiteral(intervalStr,
             literal.getParserPosition(), typeFactory.getTypeSystem());
         Util.discard(values);
       }
