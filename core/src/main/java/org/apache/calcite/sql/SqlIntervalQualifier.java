@@ -90,8 +90,8 @@ public class SqlIntervalQualifier extends SqlNode {
 
   private static final BigDecimal ZERO = BigDecimal.ZERO;
   private static final BigDecimal THOUSAND = BigDecimal.valueOf(1000);
-  private static final BigDecimal INT_MAX_VALUE_PLUS_ONE =
-      BigDecimal.valueOf(Integer.MAX_VALUE).add(BigDecimal.ONE);
+  private static final BigDecimal LONG_MAX_VALUE_PLUS_ONE =
+      BigDecimal.valueOf(Long.MAX_VALUE).add(BigDecimal.ONE);
 
   //~ Instance fields --------------------------------------------------------
 
@@ -390,7 +390,7 @@ public class SqlIntervalQualifier extends SqlNode {
     final int startPrecision = getStartPrecision(typeSystem);
     return startPrecision < POWERS10.length
         ? value.compareTo(POWERS10[startPrecision]) < 0
-        : value.compareTo(INT_MAX_VALUE_PLUS_ONE) < 0;
+        : value.compareTo(LONG_MAX_VALUE_PLUS_ONE) < 0;
   }
 
   private void checkLeadFieldInRange(RelDataTypeSystem typeSystem, int sign,
@@ -452,34 +452,34 @@ public class SqlIntervalQualifier extends SqlNode {
     return new BigDecimal("0." + secondFracStr).multiply(THOUSAND);
   }
 
-  private static int[] fillIntervalValueArray(
+  private static long[] fillIntervalValueArray(
       int sign,
       BigDecimal year,
       BigDecimal month) {
-    int[] ret = new int[3];
+    long[] ret = new long[3];
 
     ret[0] = sign;
-    ret[1] = year.intValue();
-    ret[2] = month.intValue();
+    ret[1] = year.longValue();
+    ret[2] = month.longValue();
 
     return ret;
   }
 
-  private static int[] fillIntervalValueArray(
+  private static long[] fillIntervalValueArray(
       int sign,
       BigDecimal day,
       BigDecimal hour,
       BigDecimal minute,
       BigDecimal second,
       BigDecimal secondFrac) {
-    int[] ret = new int[6];
+    long[] ret = new long[6];
 
     ret[0] = sign;
-    ret[1] = day.intValue();
-    ret[2] = hour.intValue();
-    ret[3] = minute.intValue();
-    ret[4] = second.intValue();
-    ret[5] = secondFrac.intValue();
+    ret[1] = day.longValue();
+    ret[2] = hour.longValue();
+    ret[3] = minute.longValue();
+    ret[4] = second.longValue();
+    ret[5] = secondFrac.longValue();
 
     return ret;
   }
@@ -490,7 +490,7 @@ public class SqlIntervalQualifier extends SqlNode {
    * @throws org.apache.calcite.runtime.CalciteContextException if the interval
    * value is illegal
    */
-  private int[] evaluateIntervalLiteralAsYear(
+  private long[] evaluateIntervalLiteralAsYear(
       RelDataTypeSystem typeSystem, int sign,
       String value,
       String originalValue,
@@ -525,7 +525,7 @@ public class SqlIntervalQualifier extends SqlNode {
    * @throws org.apache.calcite.runtime.CalciteContextException if the interval
    * value is illegal
    */
-  private int[] evaluateIntervalLiteralAsYearToMonth(
+  private long[] evaluateIntervalLiteralAsYearToMonth(
       RelDataTypeSystem typeSystem, int sign,
       String value,
       String originalValue,
@@ -565,7 +565,7 @@ public class SqlIntervalQualifier extends SqlNode {
    * @throws org.apache.calcite.runtime.CalciteContextException if the interval
    * value is illegal
    */
-  private int[] evaluateIntervalLiteralAsMonth(
+  private long[] evaluateIntervalLiteralAsMonth(
       RelDataTypeSystem typeSystem, int sign,
       String value,
       String originalValue,
@@ -600,7 +600,7 @@ public class SqlIntervalQualifier extends SqlNode {
    * @throws org.apache.calcite.runtime.CalciteContextException if the interval
    * value is illegal
    */
-  private int[] evaluateIntervalLiteralAsQuarter(
+  private long[] evaluateIntervalLiteralAsQuarter(
       RelDataTypeSystem typeSystem, int sign,
       String value,
       String originalValue,
@@ -635,7 +635,7 @@ public class SqlIntervalQualifier extends SqlNode {
    * @throws org.apache.calcite.runtime.CalciteContextException if the interval
    * value is illegal
    */
-  private int[] evaluateIntervalLiteralAsWeek(
+  private long[] evaluateIntervalLiteralAsWeek(
       RelDataTypeSystem typeSystem, int sign,
       String value,
       String originalValue,
@@ -670,7 +670,7 @@ public class SqlIntervalQualifier extends SqlNode {
    * @throws org.apache.calcite.runtime.CalciteContextException if the interval
    * value is illegal
    */
-  private int[] evaluateIntervalLiteralAsDay(
+  private long[] evaluateIntervalLiteralAsDay(
       RelDataTypeSystem typeSystem, int sign,
       String value,
       String originalValue,
@@ -705,7 +705,7 @@ public class SqlIntervalQualifier extends SqlNode {
    * @throws org.apache.calcite.runtime.CalciteContextException if the interval
    * value is illegal
    */
-  private int[] evaluateIntervalLiteralAsDayToHour(
+  private long[] evaluateIntervalLiteralAsDayToHour(
       RelDataTypeSystem typeSystem, int sign,
       String value,
       String originalValue,
@@ -745,7 +745,7 @@ public class SqlIntervalQualifier extends SqlNode {
    * @throws org.apache.calcite.runtime.CalciteContextException if the interval
    * value is illegal
    */
-  private int[] evaluateIntervalLiteralAsDayToMinute(
+  private long[] evaluateIntervalLiteralAsDayToMinute(
       RelDataTypeSystem typeSystem, int sign,
       String value,
       String originalValue,
@@ -788,7 +788,7 @@ public class SqlIntervalQualifier extends SqlNode {
    * @throws org.apache.calcite.runtime.CalciteContextException if the interval
    * value is illegal
    */
-  private int[] evaluateIntervalLiteralAsDayToSecond(
+  private long[] evaluateIntervalLiteralAsDayToSecond(
       RelDataTypeSystem typeSystem, int sign,
       String value,
       String originalValue,
@@ -864,7 +864,7 @@ public class SqlIntervalQualifier extends SqlNode {
    * @throws org.apache.calcite.runtime.CalciteContextException if the interval
    * value is illegal
    */
-  private int[] evaluateIntervalLiteralAsHour(
+  private long[] evaluateIntervalLiteralAsHour(
       RelDataTypeSystem typeSystem, int sign,
       String value,
       String originalValue,
@@ -900,7 +900,7 @@ public class SqlIntervalQualifier extends SqlNode {
    * @throws org.apache.calcite.runtime.CalciteContextException if the interval
    * value is illegal
    */
-  private int[] evaluateIntervalLiteralAsHourToMinute(
+  private long[] evaluateIntervalLiteralAsHourToMinute(
       RelDataTypeSystem typeSystem, int sign,
       String value,
       String originalValue,
@@ -941,7 +941,7 @@ public class SqlIntervalQualifier extends SqlNode {
    * @throws org.apache.calcite.runtime.CalciteContextException if the interval
    * value is illegal
    */
-  private int[] evaluateIntervalLiteralAsHourToSecond(
+  private long[] evaluateIntervalLiteralAsHourToSecond(
       RelDataTypeSystem typeSystem, int sign,
       String value,
       String originalValue,
@@ -1014,7 +1014,7 @@ public class SqlIntervalQualifier extends SqlNode {
    * @throws org.apache.calcite.runtime.CalciteContextException if the interval
    * value is illegal
    */
-  private int[] evaluateIntervalLiteralAsMinute(
+  private long[] evaluateIntervalLiteralAsMinute(
       RelDataTypeSystem typeSystem, int sign,
       String value,
       String originalValue,
@@ -1050,7 +1050,7 @@ public class SqlIntervalQualifier extends SqlNode {
    * @throws org.apache.calcite.runtime.CalciteContextException if the interval
    * value is illegal
    */
-  private int[] evaluateIntervalLiteralAsMinuteToSecond(
+  private long[] evaluateIntervalLiteralAsMinuteToSecond(
       RelDataTypeSystem typeSystem, int sign,
       String value,
       String originalValue,
@@ -1119,7 +1119,7 @@ public class SqlIntervalQualifier extends SqlNode {
    * @throws org.apache.calcite.runtime.CalciteContextException if the interval
    * value is illegal
    */
-  private int[] evaluateIntervalLiteralAsSecond(
+  private long[] evaluateIntervalLiteralAsSecond(
       RelDataTypeSystem typeSystem,
       int sign,
       String value,
@@ -1186,7 +1186,7 @@ public class SqlIntervalQualifier extends SqlNode {
    * @throws org.apache.calcite.runtime.CalciteContextException if the interval
    * value is illegal
    */
-  public int[] evaluateIntervalLiteral(String value, SqlParserPos pos,
+  public long[] evaluateIntervalLiteral(String value, SqlParserPos pos,
       RelDataTypeSystem typeSystem) {
     // save original value for if we have to throw
     final String value0 = value;

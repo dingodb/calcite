@@ -419,7 +419,7 @@ public final class SqlParserUtil {
       SqlIntervalQualifier intervalQualifier) {
     Preconditions.checkArgument(!intervalQualifier.isYearMonth(),
         "interval must be day time");
-    int[] ret;
+    long[] ret;
     try {
       ret = intervalQualifier.evaluateIntervalLiteral(literal,
           intervalQualifier.getParserPosition(), RelDataTypeSystem.DEFAULT);
@@ -460,7 +460,7 @@ public final class SqlParserUtil {
       SqlIntervalQualifier intervalQualifier) {
     Preconditions.checkArgument(intervalQualifier.isYearMonth(),
         "interval must be year month");
-    int[] ret;
+    long[] ret;
     try {
       ret = intervalQualifier.evaluateIntervalLiteral(literal,
           intervalQualifier.getParserPosition(), RelDataTypeSystem.DEFAULT);
