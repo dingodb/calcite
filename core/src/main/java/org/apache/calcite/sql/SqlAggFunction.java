@@ -220,10 +220,13 @@ public abstract class SqlAggFunction extends SqlFunction implements Context {
 
                         if (nodeType.getSqlTypeName() == SqlTypeName.TINYINT) {
                             precision = 25;
+                            scale = 4;
                         } else if(nodeType.getSqlTypeName() == SqlTypeName.INTEGER) {
                             precision = 32;
+                            scale = 4;
                         } else if(nodeType.getSqlTypeName() == SqlTypeName.BIGINT) {
                             precision = 41;
+                            scale = 4;
                         } else if(nodeType.getSqlTypeName() == SqlTypeName.DECIMAL) {
                             precision = nodeType.getPrecision() + 22;
                             precision = precision > 65 ? 65 : precision;
