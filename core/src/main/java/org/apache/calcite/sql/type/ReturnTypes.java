@@ -621,10 +621,21 @@ public abstract class ReturnTypes {
     RelDataType type2 = opBinding.getOperandType(1);
 
     SqlOperator sqlOperator = opBinding.getOperator();
-    if ((type1.getSqlTypeName() == SqlTypeName.INTEGER && type2.getSqlTypeName() == SqlTypeName.INTEGER)
-        || (type1.getSqlTypeName() == SqlTypeName.TINYINT && type2.getSqlTypeName() == SqlTypeName.TINYINT)) {
+    if (type1.getSqlTypeName() == SqlTypeName.INTEGER) {
+        if(type2.getSqlTypeName() == SqlTypeName.INTEGER || type2.getSqlTypeName() == SqlTypeName.TINYINT) {
+            if (sqlOperator.getName().equalsIgnoreCase("*")) {
+                return typeFactory.createSqlType(SqlTypeName.BIGINT);
+            }
+        }
+    } else if (type1.getSqlTypeName() == SqlTypeName.TINYINT) {
         if (sqlOperator.getName().equalsIgnoreCase("*")) {
-            return typeFactory.createSqlType(SqlTypeName.BIGINT);
+            if(type2.getSqlTypeName() == SqlTypeName.TINYINT || type2.getSqlTypeName() == SqlTypeName.INTEGER) {
+                return typeFactory.createSqlType(SqlTypeName.BIGINT);
+            } else if(type2.getSqlTypeName() == SqlTypeName.FLOAT) {
+                return typeFactory.createSqlType(SqlTypeName.FLOAT);
+            } else if(type2.getSqlTypeName() == SqlTypeName.DOUBLE) {
+                return typeFactory.createSqlType(SqlTypeName.DOUBLE);
+            }
         }
     } else if (type1.getSqlTypeName() == SqlTypeName.FLOAT && type2.getSqlTypeName() == SqlTypeName.FLOAT) {
         if (sqlOperator.getName().equalsIgnoreCase("*")) {
@@ -703,16 +714,32 @@ public abstract class ReturnTypes {
     RelDataType type2 = opBinding.getOperandType(1);
 
     SqlOperator sqlOperator = opBinding.getOperator();
-    if ((type1.getSqlTypeName() == SqlTypeName.INTEGER && type2.getSqlTypeName() == SqlTypeName.INTEGER)
-        || (type1.getSqlTypeName() == SqlTypeName.TINYINT && type2.getSqlTypeName() == SqlTypeName.TINYINT)) {
-        if (sqlOperator.getName().equalsIgnoreCase("+") ||
-            sqlOperator.getName().equalsIgnoreCase("-")) {
-            return typeFactory.createSqlType(SqlTypeName.BIGINT);
+    if (type1.getSqlTypeName() == SqlTypeName.INTEGER) {
+        if(type2.getSqlTypeName() == SqlTypeName.INTEGER ||  type2.getSqlTypeName() == SqlTypeName.TINYINT) {
+            if (sqlOperator.getName().equalsIgnoreCase("+") ||
+                sqlOperator.getName().equalsIgnoreCase("-")) {
+                return typeFactory.createSqlType(SqlTypeName.BIGINT);
+            }
         }
-    } else if(type1.getSqlTypeName() == SqlTypeName.FLOAT && type2.getSqlTypeName() == SqlTypeName.FLOAT) {
+    } else if (type1.getSqlTypeName() == SqlTypeName.TINYINT) {
         if (sqlOperator.getName().equalsIgnoreCase("+") ||
             sqlOperator.getName().equalsIgnoreCase("-")) {
-            return typeFactory.createSqlType(SqlTypeName.DOUBLE);
+            if(type2.getSqlTypeName() == SqlTypeName.INTEGER ||  type2.getSqlTypeName() == SqlTypeName.TINYINT) {
+                return typeFactory.createSqlType(SqlTypeName.BIGINT);
+            } else if(type2.getSqlTypeName() == SqlTypeName.FLOAT) {
+                return typeFactory.createSqlType(SqlTypeName.FLOAT);
+            } else if(type2.getSqlTypeName() == SqlTypeName.DOUBLE) {
+                return typeFactory.createSqlType(SqlTypeName.DOUBLE);
+            }
+        }
+    } else if(type1.getSqlTypeName() == SqlTypeName.FLOAT) {
+        if (sqlOperator.getName().equalsIgnoreCase("+") ||
+            sqlOperator.getName().equalsIgnoreCase("-")) {
+            if(type2.getSqlTypeName() == SqlTypeName.FLOAT) {
+                return typeFactory.createSqlType(SqlTypeName.DOUBLE);
+            } else if(type2.getSqlTypeName() == SqlTypeName.TINYINT) {
+                return typeFactory.createSqlType(SqlTypeName.FLOAT);
+            }
         }
     }
 
