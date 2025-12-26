@@ -1657,10 +1657,21 @@ public abstract class RelOptUtil {
       if (kind == SqlKind.EQUALS
           || (filterNulls != null && kind == SqlKind.IS_NOT_DISTINCT_FROM)) {
         final List<RexNode> operands = call.getOperands();
-        if ((operands.get(0) instanceof RexInputRef)
-            && (operands.get(1) instanceof RexInputRef)) {
-          RexInputRef op0 = (RexInputRef) operands.get(0);
-          RexInputRef op1 = (RexInputRef) operands.get(1);
+        RexNode rexNode0, rexNode1;
+        if (operands.get(0).getKind() == SqlKind.CAST) {
+          rexNode0 = ((RexCall) operands.get(0)).getOperands().get(0);
+        } else {
+          rexNode0 = operands.get(0);
+        }
+        if (operands.get(1).getKind() == SqlKind.CAST) {
+          rexNode1 = ((RexCall) operands.get(1)).getOperands().get(0);
+        } else {
+          rexNode1 = operands.get(1);
+        }
+        if ((rexNode0 instanceof RexInputRef)
+                && (rexNode1 instanceof RexInputRef)) {
+          RexInputRef op0 = (RexInputRef) rexNode0;
+          RexInputRef op1 = (RexInputRef) rexNode1;
 
           RexInputRef leftField;
           RexInputRef rightField;
