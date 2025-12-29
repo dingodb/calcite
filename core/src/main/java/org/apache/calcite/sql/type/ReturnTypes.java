@@ -739,6 +739,24 @@ public abstract class ReturnTypes {
     RelDataTypeFactory typeFactory = opBinding.getTypeFactory();
     RelDataType type1 = opBinding.getOperandType(0);
     RelDataType type2 = opBinding.getOperandType(1);
+
+    if(type1.getSqlTypeName() == SqlTypeName.TINYINT) {
+        if(type2.getSqlTypeName() == SqlTypeName.INTEGER
+            || type2.getSqlTypeName() == SqlTypeName.BIGINT) {
+            return typeFactory.createSqlType(type2.getSqlTypeName());
+        } else if(type2.getSqlTypeName() == SqlTypeName.FLOAT
+            || type2.getSqlTypeName() == SqlTypeName.DOUBLE) {
+            return typeFactory.createSqlType(SqlTypeName.DOUBLE);
+        }
+    } else if(type2.getSqlTypeName() == SqlTypeName.TINYINT) {
+        if(type1.getSqlTypeName() == SqlTypeName.INTEGER
+            ||type1.getSqlTypeName() == SqlTypeName.BIGINT) {
+            return typeFactory.createSqlType(type1.getSqlTypeName());
+        }  else if(type1.getSqlTypeName() == SqlTypeName.FLOAT
+            || type1.getSqlTypeName() == SqlTypeName.DOUBLE) {
+            return typeFactory.createSqlType(SqlTypeName.DOUBLE);
+        }
+    }
     return typeFactory.getTypeSystem().deriveDecimalModType(typeFactory, type1, type2);
   };
 
