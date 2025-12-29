@@ -55,14 +55,6 @@ public class SqlReturnTypeInferenceChain implements SqlReturnTypeInference {
     for (SqlReturnTypeInference rule : rules) {
       RelDataType ret = rule.inferReturnType(opBinding);
       if (ret != null) {
-        if (opBinding.getOperator().getKind() == SqlKind.DIVIDE &&
-            SqlTypeName.DECIMAL.equals(ret.getSqlTypeName())) {
-            return opBinding.getTypeFactory().
-                    createSqlType(
-                            SqlTypeName.DECIMAL,
-                            ret.getPrecision(),
-                            8);
-        }
         return ret;
       }
     }

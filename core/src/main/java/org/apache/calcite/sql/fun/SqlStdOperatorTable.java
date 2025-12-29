@@ -286,9 +286,22 @@ public class SqlStdOperatorTable extends ReflectiveSqlOperatorTable {
           SqlKind.DIVIDE,
           60,
           true,
-          ReturnTypes.QUOTIENT_NULLABLE,
+          ReturnTypes.DIV_DECIMAL_QUOTIENT_NULLABLE,
           InferTypes.FIRST_KNOWN,
           OperandTypes.DIVISION_OPERATOR);
+
+  /**
+   * Arithmetic division operator, '<code>/</code>'.
+   */
+  public static final SqlBinaryOperator DIVIDE_SPECIAL_SCALE =
+          new SqlBinaryOperator(
+                  "/SCALE",
+                  SqlKind.DIVIDE,
+                  60,
+                  true,
+                  ReturnTypes.QUOTIENT_NULLABLE,
+                  InferTypes.FIRST_KNOWN,
+                  OperandTypes.DIVISION_OPERATOR);
 
   /**
    * Arithmetic remainder operator, '<code>%</code>',

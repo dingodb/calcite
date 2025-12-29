@@ -440,7 +440,7 @@ public class AggregateReduceFunctionsRule
         oldCall.getType(), numeratorRef.getType().isNullable());
     numeratorRef = rexBuilder.ensureType(avgType, numeratorRef, true);
     final RexNode divideRef =
-        rexBuilder.makeCall(SqlStdOperatorTable.DIVIDE, numeratorRef, denominatorRef);
+        rexBuilder.makeCall(SqlStdOperatorTable.DIVIDE_SPECIAL_SCALE, numeratorRef, denominatorRef);
     return rexBuilder.makeCast(oldCall.getType(), divideRef);
   }
 
