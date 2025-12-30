@@ -22,17 +22,10 @@ import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelDataTypeImpl;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.rel.type.RelProtoDataType;
-import org.apache.calcite.sql.ExplicitOperatorBinding;
-import org.apache.calcite.sql.SqlCall;
-import org.apache.calcite.sql.SqlCallBinding;
-import org.apache.calcite.sql.SqlCollation;
-import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.SqlNodeList;
-import org.apache.calcite.sql.SqlOperator;
-import org.apache.calcite.sql.SqlOperatorBinding;
-import org.apache.calcite.sql.SqlUtil;
+import org.apache.calcite.sql.*;
 import org.apache.calcite.sql.validate.SqlValidatorNamespace;
 import org.apache.calcite.util.Glossary;
+import org.apache.calcite.util.Pair;
 import org.apache.calcite.util.Util;
 
 import com.google.common.base.Preconditions;
@@ -670,6 +663,64 @@ public abstract class ReturnTypes {
    * quotient of two exact numeric operands where at least one of the operands
    * is a decimal.
    */
+  public static final SqlReturnTypeInference DIV_DECIMAL_QUOTIENT = opBinding -> {
+    RelDataTypeFactory typeFactory = opBinding.getTypeFactory();
+    if (opBinding instanceof SqlCallBinding) {
+      SqlCallBinding sqlCallBinding = (SqlCallBinding) opBinding;
+      SqlCall sqlCall = sqlCallBinding.getCall();
+      int operandSize = sqlCall.getOperandList().size();
+      if (operandSize == 2) {
+        SqlNode sqlNode0 = sqlCall.getOperandList().get(0);
+        SqlNode sqlNode1 = sqlCall.getOperandList().get(1);
+        int scale = -1;
+        int prec = -1;
+        Pair<Integer, Integer> scalePrecision = extractPrecisionScale(sqlNode0);
+        if (scalePrecision != null) {
+          prec = scalePrecision.left;
+          scale = scalePrecision.right;
+          scalePrecision = extractPrecisionScale(sqlNode1);
+          if (scalePrecision != null) {
+            return typeFactory.createSqlType(SqlTypeName.DECIMAL, scale + 4 + scalePrecision.right + prec, scale + 4);
+          }
+        }
+      }
+    }
+
+    RelDataType type1 = opBinding.getOperandType(0);
+    RelDataType type2 = opBinding.getOperandType(1);
+
+    SqlOperator sqlOperator = opBinding.getOperator();
+    if(type1.getSqlTypeName() == SqlTypeName.FLOAT && type2.getSqlTypeName() == SqlTypeName.FLOAT) {
+      if (sqlOperator.getName().equalsIgnoreCase("/")) {
+        return typeFactory.createSqlType(SqlTypeName.DOUBLE);
+      }
+    }
+
+    return typeFactory.getTypeSystem().deriveDecimalDivideType(typeFactory, type1, type2);
+  };
+
+  private static Pair<Integer, Integer> extractPrecisionScale(SqlNode sqlNode) {
+    if (sqlNode instanceof SqlBasicCall) {
+      SqlBasicCall sqlBasicCall = (SqlBasicCall) sqlNode;
+      if (sqlBasicCall.getOperator().getKind() == SqlKind.CAST) {
+        if (sqlBasicCall.getOperandList().get(0) instanceof SqlNumericLiteral) {
+          SqlNumericLiteral sqlNumericLiteral = (SqlNumericLiteral) sqlBasicCall.getOperandList().get(0);
+          return Pair.of(sqlNumericLiteral.getPrec() - sqlNumericLiteral.getScale(), sqlNumericLiteral.getScale());
+        }
+      }
+    } else if (sqlNode instanceof SqlNumericLiteral) {
+      SqlNumericLiteral sqlNumericLiteral = (SqlNumericLiteral) sqlNode;
+      return Pair.of(sqlNumericLiteral.getPrec() - sqlNumericLiteral.getScale(), sqlNumericLiteral.getScale());
+    }
+
+    return null;
+  }
+
+  /**
+   * Type-inference strategy whereby the result type of a call is the decimal
+   * quotient of two exact numeric operands where at least one of the operands
+   * is a decimal.
+   */
   public static final SqlReturnTypeInference DECIMAL_QUOTIENT = opBinding -> {
     RelDataTypeFactory typeFactory = opBinding.getTypeFactory();
     RelDataType type1 = opBinding.getOperandType(0);
@@ -692,6 +743,14 @@ public abstract class ReturnTypes {
    */
   public static final SqlReturnTypeInference DECIMAL_QUOTIENT_NULLABLE =
       DECIMAL_QUOTIENT.andThen(SqlTypeTransforms.TO_NULLABLE);
+
+  /**
+   * Same as {@link #DECIMAL_QUOTIENT} but returns with nullability if any of
+   * the operands is nullable by using
+   * {@link org.apache.calcite.sql.type.SqlTypeTransforms#TO_NULLABLE}.
+   */
+  public static final SqlReturnTypeInference DIV_DECIMAL_QUOTIENT_NULLABLE =
+          DIV_DECIMAL_QUOTIENT.andThen(SqlTypeTransforms.TO_NULLABLE);
 
   /**
    * Type-inference strategy whereby the result type of a call is
