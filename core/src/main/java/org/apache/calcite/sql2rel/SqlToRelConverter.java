@@ -71,6 +71,7 @@ import org.apache.calcite.schema.Table;
 import org.apache.calcite.schema.TranslatableTable;
 import org.apache.calcite.schema.Wrapper;
 import org.apache.calcite.sql.*;
+import org.apache.calcite.sql.fun.SqlAvgAggFunction;
 import org.apache.calcite.sql.fun.SqlCase;
 import org.apache.calcite.sql.fun.SqlInOperator;
 import org.apache.calcite.sql.fun.SqlQuantifyOperator;
@@ -2173,9 +2174,16 @@ public class SqlToRelConverter {
           "already in window agg mode");
       bb.window = window;
       RexNode rexAgg = exprConverter.convertCall(bb, aggCall);
-      rexAgg =
-          rexBuilder.ensureType(
-              validator().getValidatedNodeType(call), rexAgg, false);
+
+      if(aggCall.getOperator() instanceof SqlAvgAggFunction) {
+          RelDataType targetType = rexAgg.getType();
+          rexAgg =
+              rexBuilder.ensureType(targetType, rexAgg, false);
+      } else {
+          rexAgg =
+              rexBuilder.ensureType(
+                  validator().getValidatedNodeType(call), rexAgg, false);
+      }
 
       // Walk over the tree and apply 'over' to all agg functions. This is
       // necessary because the returned expression is not necessarily a call
