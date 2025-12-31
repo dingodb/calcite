@@ -259,18 +259,23 @@ public abstract class SqlAggFunction extends SqlFunction implements Context {
 
                         if (nodeType.getSqlTypeName() == SqlTypeName.TINYINT) {
                             precision = 7;
+                            scale = 4;
                         } else if(nodeType.getSqlTypeName() == SqlTypeName.INTEGER) {
                             precision = 14;
+                            scale = 4;
                         } else if(nodeType.getSqlTypeName() == SqlTypeName.BIGINT) {
                             precision = 23;
+                            scale = 4;
                         } else if(nodeType.getSqlTypeName() == SqlTypeName.DECIMAL) {
                             precision = nodeType.getPrecision() + 4;
                             scale = nodeType.getScale() + 4;
                         }
 
+                        int scale1 = (scale >= 4) ? scale - 4 : scale;
                         RelDataType targetType = typeFactory.createSqlType(SqlTypeName.DECIMAL,precision,scale,nullable);
+                        RelDataType targetType1 = typeFactory.createSqlType(SqlTypeName.DECIMAL,precision,scale1,nullable);
                         SqlNode sqlNode = castFunction.createCall(SqlParserPos.ZERO, operand,
-                            SqlTypeUtil.convertTypeToSpec(targetType).withNullable(targetType.isNullable()));
+                            SqlTypeUtil.convertTypeToSpec(targetType1).withNullable(targetType1.isNullable()));
                         call.setOperand(0, sqlNode);
                         argTypeBuilder.add(targetType);
                     } else if (typeName == SqlTypeName.FLOAT ) {
