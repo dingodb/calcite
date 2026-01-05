@@ -31,6 +31,7 @@ import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.SqlUtil;
+import org.apache.calcite.sql.fun.SqlAvgAggFunction;
 import org.apache.calcite.sql.validate.SqlValidatorNamespace;
 import org.apache.calcite.util.Glossary;
 import org.apache.calcite.util.Util;
@@ -1098,9 +1099,17 @@ public abstract class ReturnTypes {
 
   public static final SqlReturnTypeInference AVG_AGG_FUNCTION = opBinding -> {
     final RelDataTypeFactory typeFactory = opBinding.getTypeFactory();
-    final RelDataType relDataType =
-        typeFactory.getTypeSystem().deriveAvgAggType(typeFactory,
-            opBinding.getOperandType(0));
+    RelDataType originType = ((SqlAvgAggFunction) opBinding.getOperator()).getOriginType();
+    RelDataType relDataType;
+    if(originType != null
+        && (originType.getSqlTypeName() == SqlTypeName.TINYINT
+        || originType.getSqlTypeName() == SqlTypeName.INTEGER
+        || originType.getSqlTypeName() == SqlTypeName.BIGINT)) {
+        relDataType = typeFactory.getTypeSystem().deriveAvgAggType(typeFactory, originType);
+    } else {
+        relDataType = typeFactory.getTypeSystem().deriveAvgAggType(typeFactory, opBinding.getOperandType(0));
+    }
+
     if (opBinding.getGroupCount() == 0 || opBinding.hasFilter()) {
       return typeFactory.createTypeWithNullability(relDataType, true);
     } else {
