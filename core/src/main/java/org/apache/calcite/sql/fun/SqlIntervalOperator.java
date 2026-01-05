@@ -30,7 +30,7 @@ import org.apache.calcite.sql.type.InferTypes;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeTransforms;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 import static org.apache.calcite.sql.validate.SqlNonNullableAccessors.getOperandLiteralValueOrThrow;
 
@@ -66,17 +66,28 @@ public class SqlIntervalOperator extends SqlInternalOperator {
 
   @Override public void unparse(SqlWriter writer, SqlCall call, int leftPrec,
       int rightPrec) {
-    String intervalStr = call.getAliasStringOrDefault("interval", "INTERVAL");
-    writer.keyword(intervalStr);
+
     final SqlNode expression = call.operand(0);
     final SqlIntervalQualifier intervalQualifier = call.operand(1);
+    String intervalAlias = intervalQualifier.getAliasString("intervalAlias");
+    if (StringUtils.isEmpty(intervalAlias)) {
+      String intervalStr = call.getAliasStringOrDefault("interval", "INTERVAL");
+      writer.keyword(intervalStr);
+    } else {
+      writer.keyword(intervalAlias);
+    }
     expression.unparseWithParentheses(writer, leftPrec, rightPrec,
         !(expression instanceof SqlLiteral
             || expression instanceof SqlIdentifier
             || expression.getKind() == SqlKind.MINUS_PREFIX
             || writer.isAlwaysUseParentheses()));
     assert intervalQualifier.timeUnitRange.endUnit == null;
-    intervalQualifier.unparse(writer, 0, 0);
+    String timeUnitRange = intervalQualifier.getAliasString("aliasName");
+    if (StringUtils.isEmpty(timeUnitRange)) {
+      intervalQualifier.unparse(writer, 0, 0);
+    } else {
+      writer.keyword(timeUnitRange);
+    }
   }
 
   @Override public String getSignatureTemplate(int operandsCount) {
