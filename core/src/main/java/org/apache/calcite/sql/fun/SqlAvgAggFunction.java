@@ -22,6 +22,7 @@ import org.apache.calcite.sql.SqlFunctionCategory;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.Optionality;
 
 import com.google.common.base.Preconditions;
@@ -33,6 +34,7 @@ import com.google.common.base.Preconditions;
  * double</code>), and the result is the same type.
  */
 public class SqlAvgAggFunction extends SqlAggFunction {
+  private RelDataType originType;
 
   //~ Constructors -----------------------------------------------------------
 
@@ -85,5 +87,13 @@ public class SqlAvgAggFunction extends SqlAggFunction {
     STDDEV_SAMP,
     VAR_POP,
     VAR_SAMP
+  }
+
+  public void setOriginType(RelDataType t) {
+      this.originType = t;
+  }
+
+  public RelDataType getOriginType() {
+      return originType;
   }
 }

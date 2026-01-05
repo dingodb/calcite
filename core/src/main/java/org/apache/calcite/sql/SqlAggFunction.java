@@ -251,6 +251,7 @@ public abstract class SqlAggFunction extends SqlFunction implements Context {
                     SqlFunction castFunction = new SqlCastFunction();
                     SqlTypeName typeName = nodeType.getSqlTypeName();
 
+                    ((SqlAvgAggFunction)this).setOriginType(nodeType);
                     if(typeName == SqlTypeName.TINYINT || typeName == SqlTypeName.INTEGER
                         || typeName == SqlTypeName.BIGINT || typeName == SqlTypeName.DECIMAL) {
                         int precision = 0;

@@ -38,6 +38,7 @@ import org.apache.calcite.runtime.Resources;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.SqlUtil;
+import org.apache.calcite.sql.fun.SqlAvgAggFunction;
 import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.validate.SqlValidatorException;
@@ -445,6 +446,13 @@ public abstract class Aggregate extends SingleRel implements Hintable {
     AggCallBinding callBinding = aggCall.createBinding(this);
     RelDataType type = aggFunction.inferReturnType(callBinding);
     RelDataType expectedType = aggCall.type;
+
+    if(aggFunction instanceof SqlAvgAggFunction
+        && type.getSqlTypeName() == SqlTypeName.DECIMAL
+        && expectedType.getSqlTypeName() == SqlTypeName.DECIMAL) {
+        return true;
+    }
+
     return RelOptUtil.eq("aggCall type",
         expectedType,
         "inferred type",

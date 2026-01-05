@@ -240,12 +240,15 @@ public abstract class RelDataTypeSystemImpl implements RelDataTypeSystem {
 
   @Override public RelDataType deriveAvgAggType(RelDataTypeFactory typeFactory,
         RelDataType argumentType) {
-    if(argumentType.getSqlTypeName() == SqlTypeName.TINYINT ||
-        argumentType.getSqlTypeName() == SqlTypeName.INTEGER ||
-        argumentType.getSqlTypeName() == SqlTypeName.BIGINT) {
+    if(argumentType.getSqlTypeName() == SqlTypeName.TINYINT) {
+        return typeFactory.createSqlType(SqlTypeName.DECIMAL, 7, 4);
+    } else if(argumentType.getSqlTypeName() == SqlTypeName.INTEGER) {
         return typeFactory.createSqlType(SqlTypeName.DECIMAL, 14, 4);
+    } else if(argumentType.getSqlTypeName() == SqlTypeName.BIGINT) {
+        return typeFactory.createSqlType(SqlTypeName.DECIMAL, 23, 4);
+    } else {
+        return argumentType;
     }
-    return argumentType;
   }
 
   @Override public RelDataType deriveCovarType(RelDataTypeFactory typeFactory,
