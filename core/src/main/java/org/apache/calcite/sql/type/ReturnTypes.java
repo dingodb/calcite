@@ -784,6 +784,10 @@ public abstract class ReturnTypes {
             || type1.getSqlTypeName() == SqlTypeName.DOUBLE) {
             return typeFactory.createSqlType(SqlTypeName.DOUBLE);
         }
+    } else if(type1.getSqlTypeName() == SqlTypeName.DECIMAL && type2.getSqlTypeName() == SqlTypeName.DECIMAL) {
+        int precision = (type1.getPrecision() > type2.getPrecision()) ? type1.getPrecision() : type2.getPrecision();
+        int scale = (type1.getScale() > type2.getScale()) ? type1.getScale(): type2.getScale();
+        return typeFactory.createSqlType(SqlTypeName.DECIMAL, precision, scale);
     }
     return typeFactory.getTypeSystem().deriveDecimalModType(typeFactory, type1, type2);
   };
