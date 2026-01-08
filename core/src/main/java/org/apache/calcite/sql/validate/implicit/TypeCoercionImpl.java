@@ -170,7 +170,8 @@ public class TypeCoercionImpl extends AbstractTypeCoercion {
       // Binary arithmetic operator like: + - * /
       if (kind.belongsTo(SqlKind.BINARY_ARITHMETIC)) {
         coerced = binaryArithmeticWithStrings(binding, type1, type2);
-        coerced = coerced || binaryArithmeticForMysql(binding, type1, type2);
+        boolean isCoerced = binaryArithmeticForMysql(binding, type1, type2);
+        coerced = coerced || isCoerced;
       }
     }
     return coerced;
