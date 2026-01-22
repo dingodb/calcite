@@ -170,6 +170,10 @@ public class SqlBetweenOperator extends SqlInfixOperator {
       SqlCall call,
       int leftPrec,
       int rightPrec) {
+    if (StringUtils.isNotEmpty(call.getAliasName()) && call.isFullAlias()) {
+      writer.keyword(call.getAliasName());
+      return;
+    }
     final SqlWriter.Frame frame =
         writer.startList(FRAME_TYPE, "", "");
     call.operand(VALUE_OPERAND).unparse(writer, getLeftPrec(), 0);
@@ -179,7 +183,7 @@ public class SqlBetweenOperator extends SqlInfixOperator {
       name = super.getName();
     }
     writer.sep(name);
-    writer.sep(flag.name());
+    //writer.sep(flag.name());
 
     // If the expression for the lower bound contains a call to an AND
     // operator, we need to wrap the expression in parentheses to prevent
