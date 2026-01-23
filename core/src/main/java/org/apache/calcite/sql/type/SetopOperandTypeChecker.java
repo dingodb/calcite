@@ -31,6 +31,7 @@ import org.apache.calcite.sql.validate.implicit.TypeCoercion;
 import java.util.AbstractList;
 import java.util.List;
 
+import static org.apache.calcite.sql.validate.SqlValidatorImpl.IMPLICIT_COL_NAME;
 import static org.apache.calcite.util.Static.RESOURCE;
 
 import static java.util.Objects.requireNonNull;
@@ -67,23 +68,26 @@ public class SetopOperandTypeChecker implements SqlOperandTypeChecker {
 
       // Each operand must have the same number of columns.
       final List<RelDataTypeField> fields = argType.getFieldList();
+      Long cnt = fields.stream()
+          .filter(relDataTypeField -> !IMPLICIT_COL_NAME.equalsIgnoreCase(relDataTypeField.getName()))
+          .count();
       if (i == 0) {
-        colCount = fields.size();
+        colCount = cnt.intValue();
         continue;
       }
 
-      if (fields.size() != colCount) {
-        if (throwOnFailure) {
-          SqlNode node = callBinding.operand(i);
-          if (node instanceof SqlSelect) {
-            node = ((SqlSelect) node).getSelectList();
+      if (fields.size() != colCount && cnt.intValue() != colCount) {
+          if (throwOnFailure) {
+            SqlNode node = callBinding.operand(i);
+            if (node instanceof SqlSelect) {
+              node = ((SqlSelect) node).getSelectList();
+            }
+            throw validator.newValidationError(requireNonNull(node, "node"),
+                RESOURCE.columnCountMismatchInSetop(
+                    callBinding.getOperator().getName()));
+          } else {
+            return false;
           }
-          throw validator.newValidationError(requireNonNull(node, "node"),
-              RESOURCE.columnCountMismatchInSetop(
-                  callBinding.getOperator().getName()));
-        } else {
-          return false;
-        }
       }
     }
 
