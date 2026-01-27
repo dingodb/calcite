@@ -868,13 +868,13 @@ public class SqlWindow extends SqlCall {
         window.refName.unparse(writer, 0, 0);
       }
       if (window.partitionList.size() > 0) {
-        writer.sep("PARTITION BY");
+        writer.sep(call.getAliasStringOrDefault("partAlias", "PARTITION BY"));
         final SqlWriter.Frame partitionFrame = writer.startList("", "");
         window.partitionList.unparse(writer, 0, 0);
         writer.endList(partitionFrame);
       }
       if (window.orderList.size() > 0) {
-        writer.sep("ORDER BY");
+        writer.sep(call.getAliasStringOrDefault("orderAlias", "ORDER BY"));
         final SqlWriter.Frame orderFrame = writer.startList("", "");
         window.orderList.unparse(writer, 0, 0);
         writer.endList(orderFrame);
