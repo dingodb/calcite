@@ -465,7 +465,8 @@ public abstract class SqlUtil {
     call.operand(0).unparse(writer, leftPrec, operator.getLeftPrec());
     final boolean needsSpace = operator.needsSpace();
     writer.setNeedWhitespace(needsSpace);
-    writer.sep(operator.getName());
+    String operatorName = call.getAliasStringOrDefault("operatorName", operator.getName());
+    writer.sep(operatorName);
     writer.setNeedWhitespace(needsSpace);
     call.operand(1).unparse(writer, operator.getRightPrec(), rightPrec);
     writer.endList(frame);

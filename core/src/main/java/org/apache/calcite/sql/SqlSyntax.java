@@ -109,7 +109,7 @@ public enum SqlSyntax {
       assert call.operandCount() == 1;
       call.operand(0).unparse(writer, operator.getLeftPrec(),
           operator.getRightPrec());
-      writer.keyword(operator.getName());
+      writer.keyword(call.getAliasStringOrDefault("operatorName", operator.getName()));
     }
   },
 

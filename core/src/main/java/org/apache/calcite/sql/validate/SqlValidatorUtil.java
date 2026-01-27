@@ -351,7 +351,12 @@ public class SqlValidatorUtil {
 
     case OVER:
       // E.g. "bids over w" --> "bids"
-      return getAlias(((SqlCall) node).operand(0), ordinal);
+      //return getAlias(((SqlCall) node).operand(0), ordinal);
+      String alias = SqlUtil.deriveAliasFromSqlNode(node);
+      if(alias.length()>255){
+        return SqlUtil.deriveAliasFromOrdinal(ordinal);
+      }
+      return alias;
 
     case IDENTIFIER:
       // E.g. "foo.bar" --> "bar"
@@ -361,7 +366,7 @@ public class SqlValidatorUtil {
       if (ordinal < 0) {
         return null;
       } else {
-        String alias = SqlUtil.deriveAliasFromSqlNode(node);
+        alias = SqlUtil.deriveAliasFromSqlNode(node);
         if(alias.length()>255){
           return SqlUtil.deriveAliasFromOrdinal(ordinal);
         }
