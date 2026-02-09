@@ -24,6 +24,7 @@ import org.apache.calcite.util.Util;
 
 import org.checkerframework.checker.nullness.qual.Nullable;
 
+import static org.apache.calcite.sql.validate.SqlValidatorImpl.IMPLICIT_COL_NAME;
 import static org.apache.calcite.util.Static.RESOURCE;
 
 import static java.util.Objects.requireNonNull;
@@ -60,6 +61,9 @@ public class SetopNamespace extends AbstractNamespace {
   }
 
   @Override public SqlMonotonicity getMonotonicity(String columnName) {
+    if (IMPLICIT_COL_NAME.equalsIgnoreCase(columnName)) {
+      return SqlMonotonicity.NOT_MONOTONIC;
+    }
     SqlMonotonicity monotonicity = null;
     int index = getRowType().getFieldNames().indexOf(columnName);
     if (index < 0) {
