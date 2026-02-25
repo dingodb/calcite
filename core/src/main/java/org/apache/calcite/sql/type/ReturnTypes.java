@@ -22,16 +22,10 @@ import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelDataTypeImpl;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.rel.type.RelProtoDataType;
-import org.apache.calcite.sql.ExplicitOperatorBinding;
-import org.apache.calcite.sql.SqlCall;
-import org.apache.calcite.sql.SqlCallBinding;
-import org.apache.calcite.sql.SqlCollation;
-import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.SqlNodeList;
-import org.apache.calcite.sql.SqlOperator;
-import org.apache.calcite.sql.SqlOperatorBinding;
-import org.apache.calcite.sql.SqlUtil;
+import org.apache.calcite.sql.*;
+import org.apache.calcite.sql.fun.SqlCase;
 import org.apache.calcite.sql.fun.SqlAvgAggFunction;
+import org.apache.calcite.sql.validate.SqlValidatorImpl;
 import org.apache.calcite.sql.validate.SqlValidatorNamespace;
 import org.apache.calcite.util.Glossary;
 import org.apache.calcite.util.Util;
@@ -40,6 +34,8 @@ import com.google.common.base.Preconditions;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 import java.util.AbstractList;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.function.UnaryOperator;
 
@@ -1135,4 +1131,75 @@ public abstract class ReturnTypes {
 
   public static final SqlReturnTypeInference PERCENTILE_DISC_CONT = opBinding ->
       opBinding.getCollationType();
+
+  public static final SqlReturnTypeInference CASE_TYPE = new SqlReturnTypeInference() {
+    @Override
+    public RelDataType inferReturnType(SqlOperatorBinding opBinding) {
+      Preconditions.checkArgument(opBinding instanceof SqlCallBinding,
+          "this method must be invoke during validating, rather than RexNode building.");
+
+      SqlCallBinding callBinding = (SqlCallBinding) opBinding;
+      SqlCase caseCall = (SqlCase) callBinding.getCall();
+      SqlNodeList thenList = caseCall.getThenOperands();
+      ArrayList<SqlNode> nullList = new ArrayList<>();
+      List<RelDataType> argTypesNotNull = new ArrayList<>();
+      for (SqlNode node : thenList) {
+        RelDataType relDataType = callBinding.getValidator().deriveType(callBinding.getScope(), node);
+        if (SqlUtil.isNullLiteral(node, false)) {
+          nullList.add(node);
+        } else {
+          argTypesNotNull.add(relDataType);
+        }
+      }
+      SqlNode elseOp = caseCall.getElseOperand();
+      RelDataType elseType =
+          callBinding.getValidator().deriveType(callBinding.getScope(), caseCall.getElseOperand());
+      if (SqlUtil.isNullLiteral(elseOp, false)) {
+        nullList.add(elseOp);
+      } else {
+        argTypesNotNull.add(elseType);
+      }
+
+      return returnTypeOfControlFlowFunction(nullList, argTypesNotNull, callBinding);
+    }
+  };
+
+  private static RelDataType returnTypeOfControlFlowFunction(ArrayList<SqlNode> nullList, List<RelDataType> argTypesNotNull, SqlCallBinding callBinding) {
+    RelDataType returnType;
+    final RelDataTypeFactory typeFactory = callBinding.getTypeFactory();
+    boolean isAllNulls = argTypesNotNull.isEmpty();
+    if (!isAllNulls) {
+      RelDataType relDataType = argTypesNotNull.get(0);
+      boolean sameType = argTypesNotNull.stream().allMatch(t -> t.getSqlTypeName() == relDataType.getSqlTypeName());
+      if (sameType) {
+        boolean allSameType = argTypesNotNull.stream().allMatch(type -> type.getScale() == relDataType.getScale()
+                && type.getPrecision() == relDataType.getPrecision());
+        if (allSameType) {
+          return relDataType;
+        } else {
+          RelDataType tmp = argTypesNotNull.stream().max(Comparator.comparingInt(RelDataType::getPrecision)).orElse(null);
+          if (tmp != null) {
+            return tmp;
+          }
+	    }
+      }
+    }
+    boolean isAllNumeric = !isAllNulls && argTypesNotNull.stream().allMatch((t) -> SqlTypeUtil.isNumeric(t));
+    boolean isAllDateTime = !isAllNulls && argTypesNotNull.stream().allMatch((t) -> SqlTypeUtil.isDatetime(t));
+    boolean isAllString = !isAllNulls && argTypesNotNull.stream().allMatch((t) -> SqlTypeUtil.isString(t));
+    boolean needStringType = !(isAllNumeric || isAllDateTime || isAllString);
+
+    returnType = needStringType ?
+            typeFactory.createTypeWithNullability(typeFactory.createSqlType(SqlTypeName.VARCHAR, 2000), true) :
+            typeFactory.leastRestrictive(argTypesNotNull);
+    if (returnType == null) {
+      returnType = typeFactory.createTypeWithNullability(typeFactory.createSqlType(SqlTypeName.VARCHAR, 2000), true);
+    }
+    final SqlValidatorImpl validator = (SqlValidatorImpl) callBinding.getValidator();
+    for (SqlNode node : nullList) {
+      validator.setValidatedNodeType(node, returnType);
+    }
+
+    return returnType;
+  }
 }

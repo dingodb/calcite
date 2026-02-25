@@ -92,9 +92,11 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.apache.calcite.sql.type.NonNullableAccessors.getComponentTypeOrThrow;
 import static org.apache.calcite.util.Util.first;
@@ -467,6 +469,7 @@ public class StandardConvertletTable extends ReflectiveConvertletTable {
         typeFactory.createSqlType(SqlTypeName.BOOLEAN));
     final RexLiteral nullLiteral = rexBuilder.makeNullLiteral(
         typeFactory.createSqlType(SqlTypeName.NULL));
+    List<RelDataType> argTypesNotNull = new ArrayList<>();
     for (int i = 0; i < whenList.size(); i++) {
       if (SqlUtil.isNullLiteral(whenList.get(i), false)) {
         exprList.add(unknownLiteral);
@@ -476,18 +479,52 @@ public class StandardConvertletTable extends ReflectiveConvertletTable {
       if (SqlUtil.isNullLiteral(thenList.get(i), false)) {
         exprList.add(nullLiteral);
       } else {
-        exprList.add(cx.convertExpression(thenList.get(i)));
+        RexNode rexNode = cx.convertExpression(thenList.get(i));
+        exprList.add(rexNode);
+        argTypesNotNull.add(rexNode.getType());
       }
     }
     SqlNode elseOperand = call.getElseOperand();
     if (SqlUtil.isNullLiteral(elseOperand, false)) {
       exprList.add(nullLiteral);
     } else {
-      exprList.add(cx.convertExpression(requireNonNull(elseOperand, "elseOperand")));
+      RexNode rexNode = cx.convertExpression(requireNonNull(elseOperand, "elseOperand"));
+      exprList.add(rexNode);
+      argTypesNotNull.add(rexNode.getType());
     }
 
-    RelDataType type =
-        rexBuilder.deriveReturnType(call.getOperator(), exprList);
+    boolean isAllNulls = argTypesNotNull.isEmpty();
+    RelDataType type = null;
+    if (!isAllNulls) {
+      RelDataType firstType = argTypesNotNull.get(0);
+      boolean sameType = argTypesNotNull.stream()
+              .allMatch(dataType -> dataType.getSqlTypeName() == firstType.getSqlTypeName());
+      if (sameType) {
+        boolean allSameType = argTypesNotNull.stream().allMatch(t -> t.getScale() == firstType.getScale()
+                && t.getPrecision() == firstType.getPrecision());
+        if (allSameType) {
+          type = firstType;
+        } else {
+          RelDataType tmp = argTypesNotNull.stream().max(Comparator.comparingInt(RelDataType::getPrecision)).orElse(null);
+          if (tmp != null) {
+            type = tmp;
+          }
+        }
+      }
+    }
+    if (type == null) {
+      boolean isAllNumeric = !isAllNulls && argTypesNotNull.stream().allMatch((t) -> SqlTypeUtil.isNumeric(t));
+      boolean isAllDateTime = !isAllNulls && argTypesNotNull.stream().allMatch((t) -> SqlTypeUtil.isDatetime(t));
+      boolean isAllString = !isAllNulls && argTypesNotNull.stream().allMatch((t) -> SqlTypeUtil.isString(t));
+      boolean needStringType = !(isAllNumeric || isAllDateTime || isAllString);
+
+      type = needStringType ?
+              typeFactory.createTypeWithNullability(typeFactory.createSqlType(SqlTypeName.VARCHAR, 2000), true) :
+              typeFactory.leastRestrictive(argTypesNotNull);
+    }
+    if (type == null) {
+      type = typeFactory.createTypeWithNullability(typeFactory.createSqlType(SqlTypeName.VARCHAR, 2000), true);
+    }
     for (int i : elseArgs(exprList.size())) {
       exprList.set(i,
           rexBuilder.ensureType(type, exprList.get(i), false));
