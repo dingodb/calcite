@@ -36,6 +36,7 @@ import org.apache.calcite.sql.SqlUtil;
 import org.apache.calcite.sql.SqlWriter;
 import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.type.InferTypes;
+import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SqlOperandCountRanges;
 import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.calcite.sql.validate.SqlValidator;
@@ -138,7 +139,7 @@ public class SqlCaseOperator extends SqlOperator {
   //~ Constructors -----------------------------------------------------------
 
   private SqlCaseOperator() {
-    super("CASE", SqlKind.CASE, MDX_PRECEDENCE, true, null,
+    super("CASE", SqlKind.CASE, MDX_PRECEDENCE, true, ReturnTypes.CASE_TYPE,
         InferTypes.RETURN_TYPE, null);
   }
 
@@ -223,7 +224,7 @@ public class SqlCaseOperator extends SqlOperator {
     if (!(opBinding instanceof SqlCallBinding)) {
       return inferTypeFromOperands(opBinding);
     }
-    return inferTypeFromValidator((SqlCallBinding) opBinding);
+    return super.inferReturnType(opBinding);
   }
 
   private static RelDataType inferTypeFromValidator(
