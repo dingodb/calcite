@@ -14,8 +14,7 @@ on:
       - completed
     on:
       branches:
-        - develop
-        - main
+        - quickBI-v4.0.0
       pull_requests:
         - merged
 jobs:
@@ -28,6 +27,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        ref: 'quickBI-v4.0.0'
+
     - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:

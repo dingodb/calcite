@@ -9,9 +9,9 @@ name: Build
 
 on:
   push:
-    branches: [ main ]
+    branches: [ quickBI-v4.0.0 ]
   pull_request:
-    branches: [ main ]
+    branches: [ quickBI-v4.0.0 ]
 
 jobs:
   build:
@@ -20,19 +20,28 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-
-    - name: Set up JDK17
+      with:
+        ref: 'quickBI-v4.0.0'
+  
+    - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
+        java-version: '17'
         distribution: 'temurin'
-        java-version: 17
+        server-id: github # Value of the distributionManagement/repository/id field of the pom.xml
+        settings-path: ${{ github.workspace }} # location for the settings.xml file
 
-    - name: Clean Cache
-      run: |
-        rm -rf ~/.m2/repository/
-        rm -rf ~/.gradle/
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@af1da67850ed9a4cedd57bfd976089dd991e2582 # v4.0.0
 
-    - name: Build Calcite Project
-      run: |
-        ./gradlew build
+    # The USERNAME and TOKEN need to correspond to the credentials environment variables used in
+    # the publishing section of your build.gradle
+    - name: Publish to GitHub Packages
+      run: ./gradlew publishToMavenCentral --stacktrace
+      env:
+        ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_USERNAME }}
+        ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_PASSWORD }}
+        ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_KEY_ID }}
+        ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
 
