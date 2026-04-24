@@ -78,6 +78,8 @@ class TopDownRuleDriver implements RuleDriver {
    */
   private final Set<RelNode> passThroughCache = new HashSet<>();
 
+  public static Integer infiniteOptimize = 100000;
+
   //~ Constructors -----------------------------------------------------------
 
   TopDownRuleDriver(VolcanoPlanner planner) {
@@ -352,6 +354,9 @@ class TopDownRuleDriver implements RuleDriver {
         if (task != null) {
           tasks.add(task);
         }
+      }
+      if (tasks.size() > infiniteOptimize) {
+        throw new RuntimeException("infinite optimize");
       }
     }
 
