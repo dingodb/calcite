@@ -58,9 +58,9 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
   /**
    * Global cache for Key to RelDataType. Uses soft values to allow GC.
    */
-  private static final LoadingCache<Key, RelDataType> KEY2TYPE_CACHE =
+  public static final LoadingCache<Key, RelDataType> KEY2TYPE_CACHE =
       CacheBuilder.newBuilder()
-          .softValues()
+          .softValues().maximumSize(20000)
           .build(CacheLoader.from(RelDataTypeFactoryImpl::keyToType));
 
   /**

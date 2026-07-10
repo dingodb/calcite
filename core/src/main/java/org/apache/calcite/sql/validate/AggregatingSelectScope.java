@@ -170,6 +170,10 @@ public class AggregatingSelectScope
     target.addAll(source);
   }
 
+  public SqlNode getHavingExprs() {
+      return select.getHaving();
+  }
+
   /**
    * Returns the expressions that are in the GROUP BY clause (or the SELECT
    * DISTINCT clause, if distinct) and that can therefore be referenced
